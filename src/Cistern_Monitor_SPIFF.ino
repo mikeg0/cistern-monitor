@@ -9,16 +9,20 @@
 
 /*
 TODO:
+ - rewrite to PlatformIO C/C++ code; add libraries
+ - remove hard coded wifi credentials (store in wifi_credentials.json)
+ - remove src\Cistern_Monitor_SPIFF.ino; erase all git hub history for src\Cistern_Monitor_SPIFF.ino to remove wifi credentials
+    - https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository
  - high/low water level to global var
  - reset high/low water level var from html button
  - lost network connection js listener and UI
  - js notification API
- - OTA firmware updates
  - sleep mode (wake on HTTP request)
 
 */
 
 // Import required libraries
+//  #include <Arduino.h>
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <Arduino_JSON.h>
@@ -56,18 +60,8 @@ void notifyClients(const String &serverEventType, const int value)
 
     String jsonString = JSON.stringify(serverEvent);
 
-
     ws.textAll(jsonString);
 
-/*
-    size_t len = measureJson(root);
-    AsyncWebSocketMessageBuffer *buffer = ws.makeBuffer(len); //  creates a buffer (len + 1) for you.
-    if (buffer)
-    {
-        serializeJson(root, (char *)buffer->get(), len + 1);
-        ws.textAll(buffer);
-    }
-*/
 }
 
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
