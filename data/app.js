@@ -57,8 +57,27 @@ function onMessage(event) {
 }
 function onLoad(event) {
     initWebSocket();
-    initResetButton();
+    initButtons();
 }
-function initResetButton() {
-    document.getElementById('reset-low-water-alarm-button').addEventListener('click', () => websocket.send('reset'));
+function initButtons() {
+    document.getElementById('reset-low-water-alarm-button').addEventListener('click', () => websocket.send({'eventType': 'reset'}));
+    document.getElementById('send-status-message').addEventListener('click', () => {
+        websocket.send(JSON.stringify({'eventType': 'status-message', 'statusMessage': document.getElementById('status-message').value}))
+    });
+
+
+    document.getElementById('status-message').addEventListener('keyup', (event) => {
+        // add keyup event listener for carraige return 13 to send status message
+        if (event.code === "Enter") {
+
+            // Prevent the default action
+            event.preventDefault();
+
+            console.log(event.target.value)
+
+            websocket.send(JSON.stringify({'eventType': 'status-message', 'statusMessage': document.getElementById('status-message').value}))
+            document.getElementById('status-message').value = ''
+          }
+    });
+    
 }

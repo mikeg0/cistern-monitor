@@ -1,16 +1,5 @@
-
-
-/*********
-  Rui Santos
-  Complete project details at https://RandomNerdTutorials.com/esp32-websocket-server-arduino/
-  The above copyright notice and this permission notice shall be included in all
-  copies or substantial portions of the Software.
-*********/
-
 /*
 TODO:
- - rewrite to PlatformIO C/C++ code; add libraries
- - remove hard coded wifi credentials (store in wifi_credentials.json)
  - remove src\Cistern_Monitor_SPIFF.ino; erase all git hub history for src\Cistern_Monitor_SPIFF.ino to remove wifi credentials
     - https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository
  - high/low water level to global var
@@ -18,6 +7,10 @@ TODO:
  - lost network connection js listener and UI
  - js notification API
  - sleep mode (wake on HTTP request)
+ - LCD display: turn off backlight
+ - move LCD code to lcd library directory
+ - write high/low water level to LCD
+ - add timestamp to high/low water alarm 
 
 */
 
@@ -28,10 +21,7 @@ TODO:
 #include <Arduino_JSON.h>
 #include <AsyncElegantOTA.h>
 #include "SPIFFS.h"
-
-// Replace with your network credentials
-const char *ssid = "ConexED_2GEXT";
-const char *password = "Bubbagirl";
+#include <LiquidCrystal.h>
 
 const int networkLedPin = 2;
 
@@ -51,6 +41,8 @@ bool lowWaterAlarmState = 0;
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
+LiquidCrystal lcd(3, 22, 27, 26, 25, 33);
+
 void notifyClients(const String &serverEventType, const int value)
 {
     JSONVar serverEvent;
@@ -61,23 +53,49 @@ void notifyClients(const String &serverEventType, const int value)
     String jsonString = JSON.stringify(serverEvent);
 
     ws.textAll(jsonString);
-
 }
 
 void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
 {
+
     AwsFrameInfo *info = (AwsFrameInfo *)arg;
     if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT)
     {
 
-        data[len] = 0;
-        if (strcmp((char *)data, "reset") == 0)
+        JSONVar wsEvent = JSON.parse((char *)data);
+
+        if (JSON.typeof(wsEvent) == "undefined")
         {
-            lowWaterAlarmState = 0;
-            notifyClients("RESET", 0);
+            Serial.println("wsEvent JSON Parsing input failed!");
+            return;
         }
 
-        // TODO: handle pump reset button
+        if (wsEvent.hasOwnProperty("eventType"))
+        {
+            if (strcmp((const char *)wsEvent["eventType"], "reset") == 0)
+            {
+                // TODO: handle pump reset button
+                lowWaterAlarmState = 0;
+                notifyClients("RESET", 0);
+            }
+            else
+            {
+                if (strcmp((const char *)wsEvent["eventType"], "status-message") == 0)
+                {
+                    lcd.display();
+                    lcd.clear();
+                    // Print a message to the LCD.
+                    lcd.print((const char *)wsEvent["statusMessage"]);
+
+                    delay(3000);
+                    lcd.noDisplay();
+                }
+            }
+        }
+        else
+        {
+            Serial.println("JSON parse error");
+        }
     }
 }
 
@@ -137,10 +155,92 @@ String templateProcessor(const String &var)
     return String();
 }
 
+// Function to scroll text
+// The function acepts the following arguments:
+// row: row number where the text will be displayed
+// message: message to scroll
+// delayTime: delay between each character shifting
+// lcdColumns: number of columns of your LCD
+void scrollText(int row, String message, int delayTime, int lcdColumns)
+{
+
+    // TODO: if message is less than 16 characters, do not scroll
+    for (int i = 0; i < lcdColumns; i++)
+    {
+        message = " " + message;
+    }
+    message = message + " ";
+    for (int pos = 0; pos < message.length(); pos++)
+    {
+        lcd.setCursor(0, row);
+        lcd.print(message.substring(pos, pos + lcdColumns));
+        delay(delayTime);
+    }
+}
+
 void setup()
 {
     // Serial port for debugging purposes
     Serial.begin(115200);
+
+    if (!SPIFFS.begin(true))
+    {
+        Serial.println("ERROR: error while mounting SPIFFS");
+    }
+    Serial.println("SPIFFS mounted successfully");
+
+    // open data/wifi_credentials.json for reading
+    File file = SPIFFS.open("/wifi_credentials.json", FILE_READ);
+
+    if (!file)
+    {
+        Serial.println("ERROR: problem opening data/wifi_credentials.json for reading");
+        return;
+    }
+
+    String fileContent;
+    while (file.available())
+    {
+        // Read line by line
+        String line = file.readStringUntil('\n');
+        fileContent += line; // Append each line to fileContent
+    }
+
+    file.close();
+
+    JSONVar jsonCredentials = JSON.parse(fileContent);
+
+    if (JSON.typeof(jsonCredentials) == "undefined")
+    {
+        Serial.println("ERROR: data/wifi_credentials.json error parsing JSON");
+        return;
+    }
+
+    String password;
+    if (jsonCredentials.hasOwnProperty("password"))
+    {
+        password = (const char *)jsonCredentials["password"];
+    }
+
+    String ssid;
+    if (jsonCredentials.hasOwnProperty("ssid"))
+    {
+        ssid = (const char *)jsonCredentials["ssid"];
+    }
+
+    if (password.isEmpty() || ssid.isEmpty()) {
+        Serial.println("ERROR: password or ssid is emtpy.  please check the data/wifi_credentials.json file!");
+        return;
+    }
+
+    // set up the LCD's number of columns and rows:
+    lcd.begin(16, 2);
+
+    // Clears the LCD screen
+    lcd.clear();
+
+    // lcd.noDisplay();
+    // lcd.noBacklight();
 
     pinMode(networkLedPin, OUTPUT);
 
@@ -167,29 +267,26 @@ void setup()
     // Print ESP Local IP Address
     Serial.println("");
     Serial.print("Connected to ");
+    lcd.setCursor(0, 0);
+    lcd.print(ssid);
     Serial.println(ssid);
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
-
-    if (!SPIFFS.begin(true))
-    {
-        Serial.println("An error has occurred while mounting SPIFFS");
-    }
-    Serial.println("SPIFFS mounted successfully");
+    lcd.setCursor(0, 1);
+    lcd.print(WiFi.localIP());
+    lcd.setCursor(0, 0);
 
     initWebSocket();
 
     // Route for root / web page
-    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
+              {
+                  digitalWrite(networkLedPin, HIGH);
 
-        digitalWrite(networkLedPin, HIGH);
+                  request->send(SPIFFS, "/index.html", "text/html", false, templateProcessor);
 
-        request->send(SPIFFS, "/index.html", "text/html", false, templateProcessor);
-
-        delay(500);
-        digitalWrite(networkLedPin, LOW);
-
-    });
+                  delay(500);
+                  digitalWrite(networkLedPin, LOW); });
 
     server.serveStatic("/", SPIFFS, "/");
 
