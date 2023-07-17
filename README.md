@@ -7,7 +7,8 @@ FEATURES:
  - Low Water Float sensor (irrigation pump shutoff and alarm)
  - Real time water level feedback via WebSockets
  - HTML monitoring page
-
+ - OTA firmware updates
+ - WIFI SID and password via json config file
 
 
 TODO:
@@ -15,6 +16,5 @@ TODO:
  - reset high/low water level var from html button
  - lost network connection js listener and UI
  - js notification API
- - OTA firmware updates
- - sleep mode (wake on HTTP request)
+ - sleep mode (wake on high/low water sensor trigger)
 
