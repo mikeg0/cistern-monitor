@@ -10,7 +10,7 @@ TODO:
  - LCD display: turn off backlight
  - move LCD code to lcd library directory
  - write high/low water level to LCD
- - add timestamp to high/low water alarm 
+ - add timestamp to high/low water alarm
 
 */
 
@@ -32,7 +32,7 @@ const int lowLedPin = 12;
 const int highLedPin = 13;
 
 const int highFloatSwitch = 23;
-const int lowFloatSwitch = 22;
+const int lowFloatSwitch = 5;
 
 bool highWaterAlarmState = 0;
 bool lowWaterAlarmState = 0;
@@ -244,13 +244,13 @@ void setup()
 
     pinMode(networkLedPin, OUTPUT);
 
-    //  pinMode(lowLedPin, OUTPUT);
+     pinMode(lowLedPin, OUTPUT);
     pinMode(highLedPin, OUTPUT);
 
-    //  digitalWrite(lowLedPin, LOW);
+     digitalWrite(lowLedPin, LOW);
     digitalWrite(highLedPin, LOW);
 
-    //  pinMode(lowFloatSwitch, INPUT_PULLUP);
+     pinMode(lowFloatSwitch, INPUT_PULLUP);
     pinMode(highFloatSwitch, INPUT_PULLUP);
 
     pinMode(trigPin, OUTPUT);
@@ -303,15 +303,17 @@ void loop()
 {
     ws.cleanupClients();
 
-    //  digitalWrite(lowLedPin, lowWaterAlarmState);
+    digitalWrite(lowLedPin, !lowWaterAlarmState);  // low water float == 1 when above water line
     digitalWrite(highLedPin, highWaterAlarmState);
 
     // skip notifications until low water alarm has been reset
-    if (lowWaterAlarmState == 1)
-        return;
+    // if (lowWaterAlarmState == 1)
+    //     return;
 
     // TODO: if highWaterAlarmState == 1 alert browser max five times
 
+
+    // ==  HIGH WATER FLOAT SENSOR == //
     int tempHighWaterAlarmState = digitalRead(highFloatSwitch);
 
     if (highWaterAlarmState != tempHighWaterAlarmState)
@@ -330,11 +332,12 @@ void loop()
         }
     }
 
-    /*
-    tempLowWaterAlarmState = digitalRead(lowFloatSwitch);
+    // ==  LOW WATER FLOAT SENSOR == //
+    int tempLowWaterAlarmState = digitalRead(lowFloatSwitch);
 
     if (lowWaterAlarmState != tempLowWaterAlarmState) {
       lowWaterAlarmState = tempLowWaterAlarmState;
+      digitalWrite(lowLedPin, !lowWaterAlarmState);
       if (lowWaterAlarmState == LOW) {
         // TODO: disable OpenSrpinkler
         // send curl request to http://10.0.0.152/cv?pw=4b5a7c40078b04f5c79c5f1a463141f3&en=0&_=1688566304970
@@ -345,8 +348,9 @@ void loop()
         Serial.println("LOW_WATER_ALARM OFF");
       }
     }
-    */
 
+
+    // ==  ULTRASONIC SENSOR == //
     // Set the trigger pin LOW for 2uS
     digitalWrite(trigPin, LOW);
     delayMicroseconds(2);
@@ -374,7 +378,6 @@ void loop()
 
     notifyClients("WATER_LEVEL", distance);
 
-    // Delay before repeating measurement
-
+    // One second delay before repeating measurement
     delay(1000);
 }
