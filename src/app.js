@@ -15,22 +15,21 @@ function onClose(event) {
     console.log('Connection closed');
     setTimeout(initWebSocket, 2000);
 }
-var minWaterLevel = 0;
-var maxWaterLevel = 0;
+
 function onMessage(event) {
     let eventData = JSON.parse(event.data);
 
     switch (eventData.type) {
         case "WATER_LEVEL":
             document.getElementById('water-level-state').innerHTML = eventData.value + " mm";
+            break;
 
-            if (minWaterLevel == 0 || minWaterLevel > eventData.value) minWaterLevel = eventData.value
+        case "MIN_WATER_LEVEL":
+            document.getElementById('min-water-level').value = eventData.value + " mm";
+            break;
 
-            if (maxWaterLevel < eventData.value) maxWaterLevel = eventData.value
-
-            document.getElementById('max-water-level').value = maxWaterLevel + " mm";
-            document.getElementById('min-water-level').value = minWaterLevel + " mm";
-
+        case "MAX_WATER_LEVEL":
+            document.getElementById('max-water-level').value = eventData.value + " mm";
             break;
 
         case "HIGH_WATER_ALARM":

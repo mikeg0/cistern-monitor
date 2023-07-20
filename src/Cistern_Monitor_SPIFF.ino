@@ -4,14 +4,15 @@ TODO:
     - https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository
  - high/low water level to global var
  - reset high/low water level var from html button
+ - toggle backlight / adjust backlight brightness via html button
  - lost network connection js listener and UI
  - js notification API
  - sleep mode (wake on HTTP request)
- - LCD display: turn off backlight
+ - LCD display:
+    - turn off backlight after timeout
+    - turn on backlight if any global variable changes
  - move LCD code to lcd library directory
- - write high/low water level to LCD
  - add timestamp to high/low water alarm
-
 */
 
 // Import required libraries
@@ -21,9 +22,11 @@ TODO:
 #include <Arduino_JSON.h>
 #include <AsyncElegantOTA.h>
 #include "SPIFFS.h"
-#include <LiquidCrystal.h>
+#include <LiquidCrystal_I2C.h>
 
 const int networkLedPin = 2;
+
+const int lcdBrightnessPin = 15;
 
 const int trigPin = 17; // trigger pin for JSN-SR04T
 const int echoPin = 16; // echo pin for JSN-SR04T
@@ -37,11 +40,19 @@ const int lowFloatSwitch = 5;
 bool highWaterAlarmState = 0;
 bool lowWaterAlarmState = 0;
 
+unsigned long lcdDelayTime = 5000; // lcd: show ssid and ip for 5 seconds; after 5 seconds show low/high alarm states and water level
+
+String highWaterLcdAlarmText = "OFF";
+String lowWaterLcdAlarmText = "OFF";
+
+int minWaterLevel = 0;
+int maxWaterLevel = 0;
+
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 
-LiquidCrystal lcd(3, 22, 27, 26, 25, 33);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 void notifyClients(const String &serverEventType, const int value)
 {
@@ -155,33 +166,21 @@ String templateProcessor(const String &var)
     return String();
 }
 
-// Function to scroll text
-// The function acepts the following arguments:
-// row: row number where the text will be displayed
-// message: message to scroll
-// delayTime: delay between each character shifting
-// lcdColumns: number of columns of your LCD
-void scrollText(int row, String message, int delayTime, int lcdColumns)
-{
-
-    // TODO: if message is less than 16 characters, do not scroll
-    for (int i = 0; i < lcdColumns; i++)
-    {
-        message = " " + message;
-    }
-    message = message + " ";
-    for (int pos = 0; pos < message.length(); pos++)
-    {
-        lcd.setCursor(0, row);
-        lcd.print(message.substring(pos, pos + lcdColumns));
-        delay(delayTime);
-    }
-}
-
 void setup()
 {
     // Serial port for debugging purposes
     Serial.begin(115200);
+
+
+    lcd.init();
+    lcd.backlight();
+
+    analogWrite(lcdBrightnessPin, 25);
+
+    // Clears the LCD screen
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Starting ...");
 
     if (!SPIFFS.begin(true))
     {
@@ -228,29 +227,21 @@ void setup()
         ssid = (const char *)jsonCredentials["ssid"];
     }
 
-    if (password.isEmpty() || ssid.isEmpty()) {
+    if (password.isEmpty() || ssid.isEmpty())
+    {
         Serial.println("ERROR: password or ssid is emtpy.  please check the data/wifi_credentials.json file!");
         return;
     }
 
-    // set up the LCD's number of columns and rows:
-    lcd.begin(16, 2);
-
-    // Clears the LCD screen
-    lcd.clear();
-
-    // lcd.noDisplay();
-    // lcd.noBacklight();
-
     pinMode(networkLedPin, OUTPUT);
 
-     pinMode(lowLedPin, OUTPUT);
+    pinMode(lowLedPin, OUTPUT);
     pinMode(highLedPin, OUTPUT);
 
-     digitalWrite(lowLedPin, LOW);
+    digitalWrite(lowLedPin, LOW);
     digitalWrite(highLedPin, LOW);
 
-     pinMode(lowFloatSwitch, INPUT_PULLUP);
+    pinMode(lowFloatSwitch, INPUT_PULLUP);
     pinMode(highFloatSwitch, INPUT_PULLUP);
 
     pinMode(trigPin, OUTPUT);
@@ -267,11 +258,13 @@ void setup()
     // Print ESP Local IP Address
     Serial.println("");
     Serial.print("Connected to ");
-    lcd.setCursor(0, 0);
-    lcd.print(ssid);
     Serial.println(ssid);
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
+
+    // Print ssid and ip address on LCD
+    lcd.setCursor(0, 0);
+    lcd.print(ssid);
     lcd.setCursor(0, 1);
     lcd.print(WiFi.localIP());
     lcd.setCursor(0, 0);
@@ -301,9 +294,10 @@ void setup()
 
 void loop()
 {
+
     ws.cleanupClients();
 
-    digitalWrite(lowLedPin, !lowWaterAlarmState);  // low water float == 1 when above water line
+    digitalWrite(lowLedPin, !lowWaterAlarmState); // low water float == 1 when above water line
     digitalWrite(highLedPin, highWaterAlarmState);
 
     // skip notifications until low water alarm has been reset
@@ -311,7 +305,6 @@ void loop()
     //     return;
 
     // TODO: if highWaterAlarmState == 1 alert browser max five times
-
 
     // ==  HIGH WATER FLOAT SENSOR == //
     int tempHighWaterAlarmState = digitalRead(highFloatSwitch);
@@ -322,11 +315,13 @@ void loop()
         digitalWrite(highLedPin, highWaterAlarmState);
         if (highWaterAlarmState == HIGH)
         {
+            highWaterLcdAlarmText = "ON";
             notifyClients("HIGH_WATER_ALARM", 1);
             Serial.println("HIGH_WATER_ALARM ON");
         }
         else
         {
+            highWaterLcdAlarmText = "OFF";
             notifyClients("HIGH_WATER_ALARM", 0);
             Serial.println("HIGH_WATER_ALARM OFF");
         }
@@ -335,20 +330,27 @@ void loop()
     // ==  LOW WATER FLOAT SENSOR == //
     int tempLowWaterAlarmState = digitalRead(lowFloatSwitch);
 
-    if (lowWaterAlarmState != tempLowWaterAlarmState) {
-      lowWaterAlarmState = tempLowWaterAlarmState;
-      digitalWrite(lowLedPin, !lowWaterAlarmState);
-      if (lowWaterAlarmState == LOW) {
-        // TODO: disable OpenSrpinkler
-        // send curl request to http://10.0.0.152/cv?pw=4b5a7c40078b04f5c79c5f1a463141f3&en=0&_=1688566304970
-        notifyClients("LOW_WATER_ALARM", 1);
-        Serial.println("LOW_WATER_ALARM ON");
-      } else {
-        notifyClients("LOW_WATER_ALARM", 0);
-        Serial.println("LOW_WATER_ALARM OFF");
-      }
-    }
+    if (lowWaterAlarmState != tempLowWaterAlarmState)
+    {
+        lowWaterAlarmState = tempLowWaterAlarmState;
+        digitalWrite(lowLedPin, !lowWaterAlarmState);
+        if (lowWaterAlarmState == LOW)
+        {
+            lowWaterLcdAlarmText = "ON";
 
+            // TODO: disable OpenSrpinkler
+            // send curl request to http://10.0.0.152/cv?pw=4b5a7c40078b04f5c79c5f1a463141f3&en=0&_=1688566304970
+            notifyClients("LOW_WATER_ALARM", 1);
+            Serial.println("LOW_WATER_ALARM ON");
+        }
+        else
+        {
+            lowWaterLcdAlarmText = "OFF";
+
+            notifyClients("LOW_WATER_ALARM", 0);
+            Serial.println("LOW_WATER_ALARM OFF");
+        }
+    }
 
     // ==  ULTRASONIC SENSOR == //
     // Set the trigger pin LOW for 2uS
@@ -376,8 +378,31 @@ void loop()
     Serial.print(distance);
     Serial.println(" mm");
 
+    if (minWaterLevel == 0 || minWaterLevel > distance) minWaterLevel = distance;
+    if (maxWaterLevel < distance) maxWaterLevel = distance;
+
+    // TODO: send JSON object curWaterLevel, minWaterLevel, maxWaterLevel
     notifyClients("WATER_LEVEL", distance);
+
+    unsigned long currentTime = millis();
+
+    if (currentTime >= lcdDelayTime)
+    {
+        // lcd.display();
+        lcd.clear();
+
+        lcd.setCursor(0, 0);
+        lcd.print("High:");
+        lcd.print(highWaterLcdAlarmText);
+        lcd.print(" Low:");
+        lcd.print(lowWaterLcdAlarmText);
+        lcd.setCursor(0, 1);
+        lcd.printf("Water Level:%*d", 4, distance);
+    }
 
     // One second delay before repeating measurement
     delay(1000);
+
+    // TODO: turn off backlight after 1 minute of inactivity
+    // lcd.noBacklight();
 }

@@ -5,5 +5,13 @@
             "path": "."
         }
     ],
-    "settings": {}
+    "settings": {
+        "editor.insertSpaces": true,
+        "editor.detectIndentation": false,
+        "editor.tabSize": 4,
+        "[ini]": {
+            "editor.insertSpaces": true,
+            "editor.tabSize": 4
+        }
+    }
 }
