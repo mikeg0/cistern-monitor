@@ -11,8 +11,16 @@ TODO:
  - LCD display:
     - turn off backlight after timeout
     - turn on backlight if any global variable changes
+    - pad ON/OFF text to 3 characters
  - move LCD code to lcd library directory
  - add timestamp to high/low water alarm
+
+
+TODO hardware:
+ - 120v AC outlet plug to 5v DC transformer soldering/test
+ - rewire ESP32 to breakout board
+ - 4pin connector soldering/test
+
 */
 
 // Import required libraries
@@ -21,7 +29,7 @@ TODO:
 #include <ESPAsyncWebServer.h>
 #include <Arduino_JSON.h>
 #include <AsyncElegantOTA.h>
-#include "SPIFFS.h"
+#include <SPIFFS.h>
 #include <LiquidCrystal_I2C.h>
 
 const int networkLedPin = 2;
@@ -141,7 +149,7 @@ String templateProcessor(const String &var)
     Serial.println(var);
     if (var == "LOW_WATER_ALARM")
     {
-        if (lowWaterAlarmState)
+        if (lowWaterAlarmState == 0)
         {
             return "ON";
         }

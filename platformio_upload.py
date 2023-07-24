@@ -13,6 +13,8 @@
 
 import requests
 import hashlib
+import sys
+
 Import('env')
 
 try:
@@ -25,6 +27,11 @@ except ImportError:
     from tqdm import tqdm
 
 def on_upload(source, target, env):
+
+    uploadFiletype = "firmware"
+    if "uploadfs" in sys.argv:
+        uploadFiletype = "filesystem"
+
     firmware_path = str(source[0])
     upload_url = env.GetProjectOption('upload_url')
 
@@ -33,7 +40,7 @@ def on_upload(source, target, env):
         firmware.seek(0)
         encoder = MultipartEncoder(fields={
             'MD5': md5,
-            'firmware': ('firmware', firmware, 'application/octet-stream')}
+            uploadFiletype: (uploadFiletype, firmware, 'application/octet-stream')}
         )
 
         bar = tqdm(desc='Upload Progress',

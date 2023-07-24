@@ -60,7 +60,7 @@ function onLoad(event) {
     initButtons();
 }
 function initButtons() {
-    document.getElementById('reset-low-water-alarm-button').addEventListener('click', () => websocket.send({'eventType': 'reset'}));
+//    document.getElementById('reset-low-water-alarm-button').addEventListener('click', () => websocket.send({'eventType': 'reset'}));
     document.getElementById('send-status-message').addEventListener('click', () => {
         websocket.send(JSON.stringify({'eventType': 'status-message', 'statusMessage': document.getElementById('status-message').value}))
     });
@@ -79,5 +79,5 @@ function initButtons() {
             document.getElementById('status-message').value = ''
           }
     });
-    
+
 }
