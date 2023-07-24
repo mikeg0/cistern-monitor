@@ -52,8 +52,18 @@ function onMessage(event) {
             break;
 
         case "LOW_WATER_ALARM":
-            document.getElementById('low-water-state').innerHTML = (eventData.value == 1) ? "ON" : "OFF";
-            document.getElementById('reset-low-water-alarm-button').disabled = false;
+            if (eventData.value) {
+                document.getElementById('low-water-state').innerHTML = "ON";
+                document.getElementById('low-water-state').classList.add("alarm");
+                document.getElementById('low-water-state-card').classList.add("alarm");
+            }
+            else {
+                document.getElementById('low-water-state').innerHTML = "OFF";
+                document.getElementById('low-water-state').classList.remove("alarm");
+                document.getElementById('low-water-state-card').classList.remove("alarm");
+            }
+
+            // document.getElementById('reset-low-water-alarm-button').disabled = false;
             break;
 
     }
