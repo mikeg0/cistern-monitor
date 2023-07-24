@@ -9,10 +9,13 @@ function initWebSocket() {
     websocket.onmessage = onMessage;
 }
 function onOpen(event) {
+    document.getElementById('network-connection-lost').style.display = "none";
     console.log('Connection opened');
 }
 function onClose(event) {
     console.log('Connection closed');
+    document.getElementById('network-connection-lost').style.display = "block";
+
     setTimeout(initWebSocket, 2000);
 }
 var minWaterLevel = 0;

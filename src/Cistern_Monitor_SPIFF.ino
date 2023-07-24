@@ -2,25 +2,19 @@
 TODO:
  - remove src\Cistern_Monitor_SPIFF.ino; erase all git hub history for src\Cistern_Monitor_SPIFF.ino to remove wifi credentials
     - https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository
- - high/low water level to global var
+ - high/low water level to global var; change websocket message to JSON high/low/current water level
  - reset high/low water level var from html button
  - toggle backlight / adjust backlight brightness via html button
- - lost network connection js listener and UI
+ - test lost network connection js listener and UI
  - js notification API
- - sleep mode (wake on HTTP request)
+ - sleep mode (wake on float trigger)
  - LCD display:
     - turn off backlight after timeout
     - turn on backlight if any global variable changes
     - pad ON/OFF text to 3 characters
  - move LCD code to lcd library directory
  - add timestamp to high/low water alarm
-
-
-TODO hardware:
- - 120v AC outlet plug to 5v DC transformer soldering/test
- - rewire ESP32 to breakout board
- - 4pin connector soldering/test
-
+ - import bootstrap cdn; clean up css for responsive grid design
 */
 
 // Import required libraries

@@ -23,6 +23,11 @@ body {
     margin: 0;
 }
 
+#network-connection-lost {
+    color: #af0f0f;
+    display: none;
+}
+
 .content {
     padding: 30px;
     max-width: 600px;
@@ -31,10 +36,10 @@ body {
 
 .card {
     background-color: #F8F7F9;
-    ;
     box-shadow: 2px 2px 12px 1px rgba(140, 140, 140, .5);
-    padding-top: 10px;
-    padding-bottom: 20px;
+    padding: 20px;
+    margin: 30px;
+    border-radius: 10px;
 }
 
 .card.alarm {
