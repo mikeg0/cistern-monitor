@@ -11,6 +11,9 @@ function initWebSocket() {
 function onOpen(event) {
     document.getElementById('network-connection-lost').style.display = "none";
     console.log('Connection opened');
+
+    // setTimeout(() => websocket.send(JSON.stringify({'eventType': 'init'})), 1000);
+    websocket.send(JSON.stringify({'eventType': 'init'}))
 }
 function onClose(event) {
     console.log('Connection closed');
@@ -18,21 +21,14 @@ function onClose(event) {
 
     setTimeout(initWebSocket, 2000);
 }
-var minWaterLevel = 0;
-var maxWaterLevel = 0;
 function onMessage(event) {
     let eventData = JSON.parse(event.data);
 
     switch (eventData.type) {
         case "WATER_LEVEL":
-            document.getElementById('water-level-state').innerHTML = eventData.value + " mm";
-
-            if (minWaterLevel == 0 || minWaterLevel > eventData.value) minWaterLevel = eventData.value
-
-            if (maxWaterLevel < eventData.value) maxWaterLevel = eventData.value
-
-            document.getElementById('max-water-level').value = maxWaterLevel + " mm";
-            document.getElementById('min-water-level').value = minWaterLevel + " mm";
+            document.getElementById('water-level-state').innerHTML = eventData.value.distance + " mm";
+            document.getElementById('max-water-level').innerHTML = eventData.value.maxWaterLevel  + " mm";
+            document.getElementById('min-water-level').innerHTML = eventData.value.minWaterLevel + " mm";
 
             break;
 
@@ -74,6 +70,11 @@ function onLoad(event) {
 }
 function initButtons() {
 //    document.getElementById('reset-low-water-alarm-button').addEventListener('click', () => websocket.send({'eventType': 'reset'}));
+
+    document.getElementById('reset-water-level-minmax').addEventListener('click', () => {
+        websocket.send(JSON.stringify({'eventType': 'reset'}))
+    });
+
     document.getElementById('send-status-message').addEventListener('click', () => {
         websocket.send(JSON.stringify({'eventType': 'status-message', 'statusMessage': document.getElementById('status-message').value}))
     });

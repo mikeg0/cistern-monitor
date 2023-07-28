@@ -1,10 +1,11 @@
 /*
 TODO:
+ - fix low water float switch shorting to ground
  - remove src\Cistern_Monitor_SPIFF.ino; erase all git hub history for src\Cistern_Monitor_SPIFF.ino to remove wifi credentials
     - https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository
- - high/low water level to global var; change websocket message to JSON high/low/current water level
- - reset high/low water level var from html button
+    - rename to open-cistern
  - toggle backlight / adjust backlight brightness via html button
+ - add timestamp to high/low water alarm
  - test lost network connection js listener and UI
  - js notification API
  - sleep mode (wake on float trigger)
@@ -13,8 +14,10 @@ TODO:
     - turn on backlight if any global variable changes
     - pad ON/OFF text to 3 characters
  - move LCD code to lcd library directory
- - add timestamp to high/low water alarm
- - import bootstrap cdn; clean up css for responsive grid design
+ - clean up css; add bootstrap responsive grid
+RESEARCH/IDEAS:
+ - use openthings to iframe app for remote
+ - curl post to stats service
 */
 
 // Import required libraries
@@ -42,13 +45,16 @@ const int lowFloatSwitch = 5;
 bool highWaterAlarmState = 0;
 bool lowWaterAlarmState = 0;
 
-unsigned long lcdDelayTime = 5000; // lcd: show ssid and ip for 5 seconds; after 5 seconds show low/high alarm states and water level
+unsigned long lcdDelayTime = 10000; // lcd: show ssid and ip for 10 seconds; after 10 seconds show low/high alarm states and water level
+unsigned long lcdBacklightOffTime = 600000;  // turn off lcd backlight after 10 minutes
 
 String highWaterLcdAlarmText = "OFF";
 String lowWaterLcdAlarmText = "OFF";
 
+int prevDistance = 0;
 int minWaterLevel = 0;
 int maxWaterLevel = 0;
+
 
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
@@ -56,12 +62,25 @@ AsyncWebSocket ws("/ws");
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-void notifyClients(const String &serverEventType, const int value)
+void webSocketClientInit()
+{
+    JSONVar waterLevel;
+
+    waterLevel["distance"] = prevDistance;
+    waterLevel["minWaterLevel"] = minWaterLevel;
+    waterLevel["maxWaterLevel"] = maxWaterLevel;
+
+    notifyClients("WATER_LEVEL", waterLevel);
+    notifyClients("HIGH_WATER_ALARM", false);
+    notifyClients("LOW_WATER_ALARM", false);
+}
+
+void notifyClients(const String serverEventType, const JSONVar serverEventValue)
 {
     JSONVar serverEvent;
 
     serverEvent["type"] = serverEventType;
-    serverEvent["value"] = value;
+    serverEvent["value"] = serverEventValue;
 
     String jsonString = JSON.stringify(serverEvent);
 
@@ -85,24 +104,33 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
 
         if (wsEvent.hasOwnProperty("eventType"))
         {
+            if (strcmp((const char *)wsEvent["eventType"], "init") == 0)
+            {
+                webSocketClientInit();
+                return;
+            }
             if (strcmp((const char *)wsEvent["eventType"], "reset") == 0)
             {
                 // TODO: handle pump reset button
-                lowWaterAlarmState = 0;
-                notifyClients("RESET", 0);
-            }
-            else
-            {
-                if (strcmp((const char *)wsEvent["eventType"], "status-message") == 0)
-                {
-                    lcd.display();
-                    lcd.clear();
-                    // Print a message to the LCD.
-                    lcd.print((const char *)wsEvent["statusMessage"]);
+                // lowWaterAlarmState = 0;
+                // notifyClients("RESET", true);
 
-                    delay(3000);
-                    lcd.noDisplay();
-                }
+                prevDistance = 0;
+                minWaterLevel = 0;
+                maxWaterLevel = 0;
+
+                return;
+            }
+            if (strcmp((const char *)wsEvent["eventType"], "status-message") == 0)
+            {
+                lcd.display();
+                lcd.clear();
+                // Print a message to the LCD.
+                lcd.print((const char *)wsEvent["statusMessage"]);
+
+                delay(3000);
+                lcd.noDisplay();
+                return;
             }
         }
         else
@@ -137,7 +165,7 @@ void initWebSocket()
     ws.onEvent(onEvent);
     server.addHandler(&ws);
 }
-
+/*
 String templateProcessor(const String &var)
 {
     Serial.println(var);
@@ -167,6 +195,7 @@ String templateProcessor(const String &var)
 
     return String();
 }
+*/
 
 void setup()
 {
@@ -177,7 +206,7 @@ void setup()
     lcd.init();
     lcd.backlight();
 
-    analogWrite(lcdBrightnessPin, 25);
+    analogWrite(lcdBrightnessPin, 125);
 
     // Clears the LCD screen
     lcd.clear();
@@ -275,13 +304,21 @@ void setup()
 
     // Route for root / web page
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-              {
-                  digitalWrite(networkLedPin, HIGH);
+    {
+        digitalWrite(networkLedPin, HIGH);
 
-                  request->send(SPIFFS, "/index.html", "text/html", false, templateProcessor);
+        // reset backlight off timer
+        lcdBacklightOffTime = millis() + 600000;
+        lcd.backlight();
+        analogWrite(lcdBrightnessPin, 125);
 
-                  delay(500);
-                  digitalWrite(networkLedPin, LOW); });
+        // request->send(SPIFFS, "/index.html", "text/html", false, templateProcessor);
+        request->send(SPIFFS, "/index.html", "text/html", false);
+
+        delay(500);
+        digitalWrite(networkLedPin, LOW);
+    }
+    );
 
     server.serveStatic("/", SPIFFS, "/");
 
@@ -299,7 +336,7 @@ void loop()
 
     ws.cleanupClients();
 
-    digitalWrite(lowLedPin, !lowWaterAlarmState); // low water float == 1 when above water line
+    digitalWrite(lowLedPin, lowWaterAlarmState); // low water float == 1 when above water line
     digitalWrite(highLedPin, highWaterAlarmState);
 
     // skip notifications until low water alarm has been reset
@@ -318,38 +355,39 @@ void loop()
         if (highWaterAlarmState == HIGH)
         {
             highWaterLcdAlarmText = "ON";
-            notifyClients("HIGH_WATER_ALARM", 1);
+            notifyClients("HIGH_WATER_ALARM", true);
             Serial.println("HIGH_WATER_ALARM ON");
         }
         else
         {
             highWaterLcdAlarmText = "OFF";
-            notifyClients("HIGH_WATER_ALARM", 0);
+            notifyClients("HIGH_WATER_ALARM", false);
             Serial.println("HIGH_WATER_ALARM OFF");
         }
     }
 
     // ==  LOW WATER FLOAT SENSOR == //
-    int tempLowWaterAlarmState = digitalRead(lowFloatSwitch);
+    // int tempLowWaterAlarmState = digitalRead(lowFloatSwitch);
+    int tempLowWaterAlarmState = 0;
 
     if (lowWaterAlarmState != tempLowWaterAlarmState)
     {
         lowWaterAlarmState = tempLowWaterAlarmState;
-        digitalWrite(lowLedPin, !lowWaterAlarmState);
+        digitalWrite(lowLedPin, lowWaterAlarmState);
         if (lowWaterAlarmState == LOW)
         {
             lowWaterLcdAlarmText = "ON";
 
             // TODO: disable OpenSrpinkler
             // send curl request to http://10.0.0.152/cv?pw=4b5a7c40078b04f5c79c5f1a463141f3&en=0&_=1688566304970
-            notifyClients("LOW_WATER_ALARM", 1);
+            notifyClients("LOW_WATER_ALARM", true);
             Serial.println("LOW_WATER_ALARM ON");
         }
         else
         {
             lowWaterLcdAlarmText = "OFF";
 
-            notifyClients("LOW_WATER_ALARM", 0);
+            notifyClients("LOW_WATER_ALARM", false);
             Serial.println("LOW_WATER_ALARM OFF");
         }
     }
@@ -383,28 +421,45 @@ void loop()
     if (minWaterLevel == 0 || minWaterLevel > distance) minWaterLevel = distance;
     if (maxWaterLevel < distance) maxWaterLevel = distance;
 
-    // TODO: send JSON object curWaterLevel, minWaterLevel, maxWaterLevel
-    notifyClients("WATER_LEVEL", distance);
 
     unsigned long currentTime = millis();
 
     if (currentTime >= lcdDelayTime)
     {
-        // lcd.display();
-        lcd.clear();
+        if (distance != prevDistance)
+        {
+            prevDistance = distance;
 
-        lcd.setCursor(0, 0);
-        lcd.print("High:");
-        lcd.print(highWaterLcdAlarmText);
-        lcd.print(" Low:");
-        lcd.print(lowWaterLcdAlarmText);
-        lcd.setCursor(0, 1);
-        lcd.printf("Water Level:%*d", 4, distance);
+            JSONVar waterLevel;
+
+            waterLevel["distance"] = distance;
+            waterLevel["minWaterLevel"] = minWaterLevel;
+            waterLevel["maxWaterLevel"] = maxWaterLevel;
+
+            notifyClients("WATER_LEVEL", waterLevel);
+
+            lcd.clear();
+
+            lcd.setCursor(0, 0);
+            lcd.print("High:");
+            lcd.print(highWaterLcdAlarmText);
+            lcd.print(" Low:");
+            lcd.print(lowWaterLcdAlarmText);
+            lcd.setCursor(0, 1);
+            lcd.printf("Water Level:%*d", 4, distance);
+        }
+    }
+
+    if (currentTime >= lcdBacklightOffTime)
+    {
+        // turn off backlight after 10 minutes of inactivity
+        lcd.noBacklight();
+        analogWrite(lcdBrightnessPin, 0);
     }
 
     // One second delay before repeating measurement
     delay(1000);
 
-    // TODO: turn off backlight after 1 minute of inactivity
-    // lcd.noBacklight();
+
+
 }

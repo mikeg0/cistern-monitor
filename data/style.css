@@ -17,6 +17,7 @@ h2 {
 .topnav {
     overflow: hidden;
     background-color: #143642;
+    color: #fff;
 }
 
 body {
@@ -35,7 +36,6 @@ body {
 }
 
 .card {
-    background-color: #F8F7F9;
     box-shadow: 2px 2px 12px 1px rgba(140, 140, 140, .5);
     padding: 20px;
     margin: 30px;
@@ -46,7 +46,7 @@ body {
     outline: 5px solid #af0f0f;
 }
 
-#high-water-state.alarm {
+#high-water-state.alarm, #low-water-state.alarm {
     color: #af0f0f;
 }
 

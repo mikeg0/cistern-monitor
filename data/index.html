@@ -6,7 +6,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="icon" href="data:,">
         <link rel="stylesheet" type="text/css" href="/style.css">
-        <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-4bw+/aepP/YC94hEpVNVgiZdgIC5+VKNBQNGCHeKRQN+PtmoHDEXuppvnDJzQIu9" crossorigin="anonymous">
         <script src="/app.js"></script>
     </head>
 
@@ -18,31 +18,30 @@
             <h1>Cistern Water Level Monitor</h1>
         </div>
         <div class="content">
-            <div class="card">
+            <div id="low-water-state-card" class="card">
                 <h2>Pump Shutoff Alarm</h2>
-                <p class="state"><span id="low-water-state">%LOW_WATER_ALARM%</span></p>
+                <p class="state"><span id="low-water-state"></span></p>
                 <!-- <p><button id="reset-low-water-alarm-button" disabled class="button">Reset Alarm</button></p> -->
             </div>
             <div id="high-water-state-card" class="card">
                 <h2>Overflow Alarm</h2>
-                <p class="state"><span id="high-water-state">%HIGH_WATER_ALARM%</span></p>
+                <p class="state"><span id="high-water-state"></span></p>
             </div>
             <div class="card">
                 <h2>Current Water Level</h2>
-                <p class="state">water level: <span id="water-level-state">%WATER_LEVEL%</span></p>
+                <p class="state"><span id="water-level-state"></span></p>
             </div>
             <div class="card">
                 <h2>High Water Level</h2>
-                <input id="max-water-level" type="text" value="0" />
-            </div>
-            <div class="card">
+                <p class="state"><span id="max-water-level"></span></p>
                 <h2>Low Water Level</h2>
-                <input id="min-water-level" type="text" value="0" />
+                <p class="state"><span id="min-water-level"></span></p>
+                <p><button type="button" class="btn btn-success" id="reset-water-level-minmax">Reset</button></p>
             </div>
             <div class="card">
                 <h2>Status Messaage</h2>
                 <p><input id="status-message" type="text" value="" /></p>
-                <p><button id="send-status-message">Send</button></p>
+                <p><button type="button" class="btn btn-success" id="send-status-message">Send</button></p>
             </div>
         </div>
 
