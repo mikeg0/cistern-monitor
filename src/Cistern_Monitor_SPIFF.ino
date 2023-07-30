@@ -28,6 +28,7 @@ RESEARCH/IDEAS:
 #include <AsyncElegantOTA.h>
 #include <SPIFFS.h>
 #include <LiquidCrystal_I2C.h>
+#include <PubSubClient.h>
 
 const int networkLedPin = 2;
 
@@ -55,6 +56,11 @@ int prevDistance = 0;
 int minWaterLevel = 0;
 int maxWaterLevel = 0;
 
+// Create MQTT client
+WiFiClient espClient;
+PubSubClient mqttClient(espClient);
+
+const String mqttHost = "10.0.0.4";
 
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
@@ -166,6 +172,33 @@ void initWebSocket()
     server.addHandler(&ws);
 }
 
+void initMqtt()
+{
+    // connect to mqtt server
+    mqttClient.setServer(mqttHost.c_str(), 1883);
+
+    while (!mqttClient.connected()) {
+        Serial.print("Attempting MQTT connection...");
+        // Create a random client ID
+        String clientId = "ESP8266Client-";
+        clientId += String(random(0xffff), HEX);
+        // Attempt to connect
+        if (mqttClient.connect(clientId.c_str())) {
+           Serial.println("connected");
+        } else {
+            Serial.print("failed, rc=");
+            Serial.print(mqttClient.state());
+            Serial.println(" try again in 5 seconds");
+            // Wait 5 seconds before retrying
+            delay(5000);
+        }
+    }
+
+    String mqttMessage = "system-boot";
+    mqttClient.publish("cistern-monitor", mqttMessage.c_str());
+
+}
+
 void setup()
 {
     // Serial port for debugging purposes
@@ -271,6 +304,8 @@ void setup()
 
     initWebSocket();
 
+    initMqtt();
+
     // Route for root / web page
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
     {
@@ -302,6 +337,7 @@ void setup()
 
 void loop()
 {
+    mqttClient.loop();
 
     ws.cleanupClients();
 
@@ -326,12 +362,14 @@ void loop()
             highWaterLcdAlarmText = "ON";
             notifyClients("HIGH_WATER_ALARM", true);
             Serial.println("HIGH_WATER_ALARM ON");
+            mqttClient.publish("cistern-monitor/high-water-alarm", "on");
         }
         else
         {
             highWaterLcdAlarmText = "OFF";
             notifyClients("HIGH_WATER_ALARM", false);
             Serial.println("HIGH_WATER_ALARM OFF");
+            mqttClient.publish("cistern-monitor/high-water-alarm", "off");
         }
     }
 
@@ -351,6 +389,7 @@ void loop()
             // send curl request to http://10.0.0.152/cv?pw=4b5a7c40078b04f5c79c5f1a463141f3&en=0&_=1688566304970
             notifyClients("LOW_WATER_ALARM", true);
             Serial.println("LOW_WATER_ALARM ON");
+            mqttClient.publish("cistern-monitor/low-water-alarm", "on");
         }
         else
         {
@@ -358,6 +397,7 @@ void loop()
 
             notifyClients("LOW_WATER_ALARM", false);
             Serial.println("LOW_WATER_ALARM OFF");
+            mqttClient.publish("cistern-monitor/low-water-alarm", "off");
         }
     }
 
@@ -406,6 +446,7 @@ void loop()
             waterLevel["maxWaterLevel"] = maxWaterLevel;
 
             notifyClients("WATER_LEVEL", waterLevel);
+            mqttClient.publish("cistern-monitor/water-level", String(distance).c_str());
 
             lcd.clear();
 
