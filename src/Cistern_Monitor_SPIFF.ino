@@ -165,37 +165,6 @@ void initWebSocket()
     ws.onEvent(onEvent);
     server.addHandler(&ws);
 }
-/*
-String templateProcessor(const String &var)
-{
-    Serial.println(var);
-    if (var == "LOW_WATER_ALARM")
-    {
-        if (lowWaterAlarmState == 0)
-        {
-            return "ON";
-        }
-        else
-        {
-            return "OFF";
-        }
-    }
-
-    if (var == "HIGH_WATER_ALARM")
-    {
-        if (highWaterAlarmState)
-        {
-            return "ON";
-        }
-        else
-        {
-            return "OFF";
-        }
-    }
-
-    return String();
-}
-*/
 
 void setup()
 {
