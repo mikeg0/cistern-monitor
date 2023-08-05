@@ -24,33 +24,18 @@ RESEARCH/IDEAS:
 
 // Import required libraries
 //  #include <Arduino.h>
+#include "../lib/constants.h"
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
 #include <Arduino_JSON.h>
-#include <AsyncElegantOTA.h>
 #include <SPIFFS.h>
 #include <LiquidCrystal_I2C.h>
 #include <PubSubClient.h>
 #include "utils.h"
-
-const int networkLedPin = 2;
-
-const int lcdBrightnessPin = 15;
-
-const int trigPin = 17; // trigger pin for JSN-SR04T
-const int echoPin = 16; // echo pin for JSN-SR04T
-
-const int lowLedPin = 12;
-const int highLedPin = 13;
-
-const int highFloatSwitch = 23;
-const int lowFloatSwitch = 5;
+#include "web.h"
 
 bool highWaterAlarmState = 0;
 bool lowWaterAlarmState = 0;
-
-unsigned long lcdDelayTime = 10000; // lcd: show ssid and ip for 10 seconds; after 10 seconds show low/high alarm states and water level
-unsigned long lcdBacklightOffTime = 600000;  // turn off lcd backlight after 10 minutes
 
 String highWaterLcdAlarmText = "OFF";
 String lowWaterLcdAlarmText = "OFF";
@@ -64,138 +49,9 @@ int realTimeStats = 1;
 // Create MQTT client
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
-
-const String mqttHost = "10.0.0.4";
-
-// Create AsyncWebServer object on port 80
-AsyncWebServer server(80);
-AsyncWebSocket ws("/ws");
-
+CMWeb cisternMonitorWeb;
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-void webSocketClientInit()
-{
-    JSONVar waterLevel;
-
-    waterLevel["currentWaterLevel"] = currentWaterLevel;
-    waterLevel["minWaterLevel"] = minWaterLevel;
-    waterLevel["maxWaterLevel"] = maxWaterLevel;
-
-    notifyClients("WATER_LEVEL", waterLevel);
-    notifyClients("HIGH_WATER_ALARM", false);
-    notifyClients("LOW_WATER_ALARM", false);
-    notifyClients("REAL_TIME_STATS", realTimeStats);
-}
-
-void notifyClients(const String serverEventType, const JSONVar serverEventValue)
-{
-    JSONVar serverEvent;
-
-    serverEvent["type"] = serverEventType;
-    serverEvent["value"] = serverEventValue;
-
-    String jsonString = JSON.stringify(serverEvent);
-
-    ws.textAll(jsonString);
-}
-
-void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
-{
-
-    AwsFrameInfo *info = (AwsFrameInfo *)arg;
-    if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT)
-    {
-
-        JSONVar wsEvent = JSON.parse((char *)data);
-
-        if (JSON.typeof(wsEvent) == "undefined")
-        {
-            Serial.println("wsEvent JSON Parsing input failed!");
-            return;
-        }
-
-        if (wsEvent.hasOwnProperty("eventType"))
-        {
-            if (strcmp((const char *)wsEvent["eventType"], "init") == 0)
-            {
-                webSocketClientInit();
-                return;
-            }
-            if (strcmp((const char *)wsEvent["eventType"], "reset") == 0)
-            {
-                // TODO: handle pump reset button
-                // lowWaterAlarmState = 0;
-                // notifyClients("RESET", true);
-
-                currentWaterLevel = 0;
-                minWaterLevel = 0;
-                maxWaterLevel = 0;
-
-                return;
-            }
-
-            // temporary setting to toggle real-time water level status to websocket
-            if (strcmp((const char *)wsEvent["eventType"], "real-time") == 0)
-            {
-                realTimeStats = (int)wsEvent["value"];
-                notifyClients("REAL_TIME_STATS", realTimeStats);
-
-                if (realTimeStats == 0) {
-                    lcd.noBacklight();
-                    analogWrite(lcdBrightnessPin, 0);
-                }
-                else {
-                    lcd.backlight();
-                    analogWrite(lcdBrightnessPin, 125);
-                }
-
-
-                return;
-            }
-            if (strcmp((const char *)wsEvent["eventType"], "status-message") == 0)
-            {
-                lcd.display();
-                lcd.clear();
-                // Print a message to the LCD.
-                lcd.print((const char *)wsEvent["statusMessage"]);
-
-                delay(3000);
-                lcd.noDisplay();
-                return;
-            }
-        }
-        else
-        {
-            Serial.println("JSON parse error");
-        }
-    }
-}
-
-void onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type,
-             void *arg, uint8_t *data, size_t len)
-{
-    switch (type)
-    {
-    case WS_EVT_CONNECT:
-        Serial.printf("WebSocket client #%u connected from %s\n", client->id(), client->remoteIP().toString().c_str());
-        break;
-    case WS_EVT_DISCONNECT:
-        Serial.printf("WebSocket client #%u disconnected\n", client->id());
-        break;
-    case WS_EVT_DATA:
-        handleWebSocketMessage(arg, data, len);
-        break;
-    case WS_EVT_PONG:
-    case WS_EVT_ERROR:
-        break;
-    }
-}
-
-void initWebSocket()
-{
-    ws.onEvent(onEvent);
-    server.addHandler(&ws);
-}
 
 void connectMqtt(int initialConnect)
 {
@@ -338,36 +194,10 @@ void setup()
     lcd.print(WiFi.localIP());
     lcd.setCursor(0, 0);
 
-    initWebSocket();
+    cisternMonitorWeb.initWebSocket();
 
     connectMqtt(1);
 
-    // Route for root / web page
-    server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
-    {
-        digitalWrite(networkLedPin, HIGH);
-
-        // reset backlight off timer
-        lcdBacklightOffTime = millis() + 600000;
-        lcd.backlight();
-        analogWrite(lcdBrightnessPin, 125);
-
-        // request->send(SPIFFS, "/index.html", "text/html", false, templateProcessor);
-        request->send(SPIFFS, "/index.html", "text/html", false);
-
-        delay(500);
-        digitalWrite(networkLedPin, LOW);
-    });
-
-    server.serveStatic("/", SPIFFS, "/");
-
-    // Start ElegantOTA
-    AsyncElegantOTA.begin(&server);
-
-    // Start server
-    server.begin();
-
-    Serial.println("server started");
 }
 
 void loop()
@@ -378,7 +208,7 @@ void loop()
     }
     mqttClient.loop();
 
-    ws.cleanupClients();
+    cisternMonitorWeb.cleanupClients();
 
     if (realTimeStats == 0) return;
 
@@ -401,14 +231,14 @@ void loop()
         if (highWaterAlarmState == HIGH)
         {
             highWaterLcdAlarmText = "ON";
-            notifyClients("HIGH_WATER_ALARM", true);
+            cisternMonitorWeb.notifyClients("HIGH_WATER_ALARM", true);
             Serial.println("HIGH_WATER_ALARM ON");
             mqttClient.publish("cistern-monitor/high-water-alarm", "on");
         }
         else
         {
             highWaterLcdAlarmText = "OFF";
-            notifyClients("HIGH_WATER_ALARM", false);
+            cisternMonitorWeb.notifyClients("HIGH_WATER_ALARM", false);
             Serial.println("HIGH_WATER_ALARM OFF");
             mqttClient.publish("cistern-monitor/high-water-alarm", "off");
         }
@@ -428,7 +258,7 @@ void loop()
 
             // TODO: disable OpenSrpinkler
             // send curl request to http://10.0.0.152/cv?pw=4b5a7c40078b04f5c79c5f1a463141f3&en=0&_=1688566304970
-            notifyClients("LOW_WATER_ALARM", true);
+            cisternMonitorWeb.notifyClients("LOW_WATER_ALARM", true);
             Serial.println("LOW_WATER_ALARM ON");
             mqttClient.publish("cistern-monitor/low-water-alarm", "on");
         }
@@ -436,7 +266,7 @@ void loop()
         {
             lowWaterLcdAlarmText = "OFF";
 
-            notifyClients("LOW_WATER_ALARM", false);
+            cisternMonitorWeb.notifyClients("LOW_WATER_ALARM", false);
             Serial.println("LOW_WATER_ALARM OFF");
             mqttClient.publish("cistern-monitor/low-water-alarm", "off");
         }
@@ -488,7 +318,7 @@ void loop()
             waterLevel["minWaterLevel"] = minWaterLevel;
             waterLevel["maxWaterLevel"] = maxWaterLevel;
 
-            notifyClients("WATER_LEVEL", waterLevel);
+            cisternMonitorWeb.notifyClients("WATER_LEVEL", waterLevel);
             mqttClient.publish("cistern-monitor/water-level", String(currentWaterLevel).c_str());
 
             lcd.clear();
