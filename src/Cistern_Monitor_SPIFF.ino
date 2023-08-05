@@ -5,6 +5,7 @@ TODO:
     - https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository
     - rename to open-cistern
  - toggle backlight / adjust backlight brightness via html button
+ - toggle trend detector stats via html button (bootstrap switch)
  - add timestamp to high/low water alarm
  - test lost network connection js listener and UI
  - js notification API
@@ -15,6 +16,7 @@ TODO:
     - pad ON/OFF text to 3 characters
  - move LCD code to lcd library directory
  - clean up css; add bootstrap responsive grid
+ - MQTT: add client reconnect if disconnected on network reset (copy OSMqtt::init(void))
 RESEARCH/IDEAS:
  - use openthings to iframe app for remote
  - curl post to stats service
@@ -29,6 +31,7 @@ RESEARCH/IDEAS:
 #include <SPIFFS.h>
 #include <LiquidCrystal_I2C.h>
 #include <PubSubClient.h>
+#include "utils.h"
 
 const int networkLedPin = 2;
 
@@ -52,9 +55,11 @@ unsigned long lcdBacklightOffTime = 600000;  // turn off lcd backlight after 10 
 String highWaterLcdAlarmText = "OFF";
 String lowWaterLcdAlarmText = "OFF";
 
-int prevDistance = 0;
+int currentWaterLevel = 0;
 int minWaterLevel = 0;
 int maxWaterLevel = 0;
+
+int realTimeStats = 1;
 
 // Create MQTT client
 WiFiClient espClient;
@@ -72,13 +77,14 @@ void webSocketClientInit()
 {
     JSONVar waterLevel;
 
-    waterLevel["distance"] = prevDistance;
+    waterLevel["currentWaterLevel"] = currentWaterLevel;
     waterLevel["minWaterLevel"] = minWaterLevel;
     waterLevel["maxWaterLevel"] = maxWaterLevel;
 
     notifyClients("WATER_LEVEL", waterLevel);
     notifyClients("HIGH_WATER_ALARM", false);
     notifyClients("LOW_WATER_ALARM", false);
+    notifyClients("REAL_TIME_STATS", realTimeStats);
 }
 
 void notifyClients(const String serverEventType, const JSONVar serverEventValue)
@@ -121,9 +127,28 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
                 // lowWaterAlarmState = 0;
                 // notifyClients("RESET", true);
 
-                prevDistance = 0;
+                currentWaterLevel = 0;
                 minWaterLevel = 0;
                 maxWaterLevel = 0;
+
+                return;
+            }
+
+            // temporary setting to toggle real-time water level status to websocket
+            if (strcmp((const char *)wsEvent["eventType"], "real-time") == 0)
+            {
+                realTimeStats = (int)wsEvent["value"];
+                notifyClients("REAL_TIME_STATS", realTimeStats);
+
+                if (realTimeStats == 0) {
+                    lcd.noBacklight();
+                    analogWrite(lcdBrightnessPin, 0);
+                }
+                else {
+                    lcd.backlight();
+                    analogWrite(lcdBrightnessPin, 125);
+                }
+
 
                 return;
             }
@@ -172,16 +197,19 @@ void initWebSocket()
     server.addHandler(&ws);
 }
 
-void initMqtt()
+void connectMqtt(int initialConnect)
 {
-    // connect to mqtt server
-    mqttClient.setServer(mqttHost.c_str(), 1883);
+
+    if (initialConnect) {
+        // connect to mqtt server
+        mqttClient.setServer(mqttHost.c_str(), 1883);
+    }
 
     while (!mqttClient.connected()) {
         Serial.print("Attempting MQTT connection...");
         // Create a random client ID
-        String clientId = "ESP8266Client-";
-        clientId += String(random(0xffff), HEX);
+        String clientId = "cistern-monitor-client";
+
         // Attempt to connect
         if (mqttClient.connect(clientId.c_str())) {
            Serial.println("connected");
@@ -194,8 +222,14 @@ void initMqtt()
         }
     }
 
-    String mqttMessage = "system-boot";
-    mqttClient.publish("cistern-monitor", mqttMessage.c_str());
+    if (initialConnect) {
+        String mqttMessage = "system-boot";
+        mqttClient.publish("cistern-monitor", mqttMessage.c_str());
+    }
+    else {
+        String mqttMessage = "system-reconnect";
+        mqttClient.publish("cistern-monitor", mqttMessage.c_str());
+    }
 
 }
 
@@ -288,6 +322,8 @@ void setup()
         Serial.println("Connecting to WiFi..");
     }
 
+    WiFi.setHostname("Cistern Monitor");
+
     // Print ESP Local IP Address
     Serial.println("");
     Serial.print("Connected to ");
@@ -304,7 +340,7 @@ void setup()
 
     initWebSocket();
 
-    initMqtt();
+    connectMqtt(1);
 
     // Route for root / web page
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request)
@@ -321,8 +357,7 @@ void setup()
 
         delay(500);
         digitalWrite(networkLedPin, LOW);
-    }
-    );
+    });
 
     server.serveStatic("/", SPIFFS, "/");
 
@@ -337,9 +372,15 @@ void setup()
 
 void loop()
 {
+
+    if (!mqttClient.connected()) {
+        connectMqtt(0);
+    }
     mqttClient.loop();
 
     ws.cleanupClients();
+
+    if (realTimeStats == 0) return;
 
     digitalWrite(lowLedPin, lowWaterAlarmState); // low water float == 1 when above water line
     digitalWrite(highLedPin, highWaterAlarmState);
@@ -420,33 +461,35 @@ void loop()
     // Use 343 metres per second as speed of sound
     // Divide by 1000 as we want millimeters
 
-    int distance = (duration / 2) * 0.343;
+    currentWaterLevel = (duration / 2) * 0.343;
 
     // Print result to serial monitor
-    Serial.print(" distance: ");
-    Serial.print(distance);
+    Serial.print(" currentWaterLevel: ");
+    Serial.print(currentWaterLevel);
     Serial.println(" mm");
 
-    if (minWaterLevel == 0 || minWaterLevel > distance) minWaterLevel = distance;
-    if (maxWaterLevel < distance) maxWaterLevel = distance;
+    if (minWaterLevel == 0 || minWaterLevel > currentWaterLevel) minWaterLevel = currentWaterLevel;
+    if (maxWaterLevel < currentWaterLevel) maxWaterLevel = currentWaterLevel;
 
 
     unsigned long currentTime = millis();
 
-    if (currentTime >= lcdDelayTime)
-    {
-        if (distance != prevDistance)
-        {
-            prevDistance = distance;
+
+    // if (currentTime >= lcdDelayTime)
+    // {
+
+    //     // discover if value is trending so water level reports don't waffle
+    //     if (water_level_is_trending(currentWaterLevel) == 1)
+    //     {
 
             JSONVar waterLevel;
 
-            waterLevel["distance"] = distance;
+            waterLevel["currentWaterLevel"] = currentWaterLevel;
             waterLevel["minWaterLevel"] = minWaterLevel;
             waterLevel["maxWaterLevel"] = maxWaterLevel;
 
             notifyClients("WATER_LEVEL", waterLevel);
-            mqttClient.publish("cistern-monitor/water-level", String(distance).c_str());
+            mqttClient.publish("cistern-monitor/water-level", String(currentWaterLevel).c_str());
 
             lcd.clear();
 
@@ -456,9 +499,10 @@ void loop()
             lcd.print(" Low:");
             lcd.print(lowWaterLcdAlarmText);
             lcd.setCursor(0, 1);
-            lcd.printf("Water Level:%*d", 4, distance);
-        }
-    }
+            lcd.printf("Water Level:%*d", 4, currentWaterLevel);
+    //     }
+    // }
+    // }
 
     if (currentTime >= lcdBacklightOffTime)
     {

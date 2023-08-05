@@ -25,8 +25,12 @@ function onMessage(event) {
     let eventData = JSON.parse(event.data);
 
     switch (eventData.type) {
+        case "REAL_TIME_STATS":
+            document.getElementById('toggle-real-time').checked = eventData.value;
+            break;
+
         case "WATER_LEVEL":
-            document.getElementById('water-level-state').innerHTML = eventData.value.distance + " mm";
+            document.getElementById('water-level-state').innerHTML = eventData.value.currentWaterLevel + " mm";
             document.getElementById('max-water-level').innerHTML = eventData.value.maxWaterLevel  + " mm";
             document.getElementById('min-water-level').innerHTML = eventData.value.minWaterLevel + " mm";
 
@@ -74,6 +78,11 @@ function initButtons() {
     document.getElementById('reset-water-level-minmax').addEventListener('click', () => {
         websocket.send(JSON.stringify({'eventType': 'reset'}))
     });
+
+    document.getElementById('toggle-real-time').addEventListener('click', () => {
+        websocket.send(JSON.stringify({'eventType': 'real-time', 'value': (document.getElementById('toggle-real-time').checked) ? 1 : 0}))
+    });
+
 
     document.getElementById('send-status-message').addEventListener('click', () => {
         websocket.send(JSON.stringify({'eventType': 'status-message', 'statusMessage': document.getElementById('status-message').value}))
