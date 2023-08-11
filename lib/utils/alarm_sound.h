@@ -1,0 +1,3 @@
+
+void startupSound();
+void alarmSound();

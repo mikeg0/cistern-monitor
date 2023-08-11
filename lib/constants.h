@@ -11,8 +11,9 @@ const int lowLedPin = 12;
 const int highLedPin = 13;
 
 const int highFloatSwitch = 23;
-const int lowFloatSwitch = 5;
+const int lowFloatSwitch = 5;  // TODO: change this pin to 18;  5 outputs PWM signal at boot, strapping pin
 
+const int alarmBuzzerPin = 25;
 
 const String mqttHost = "10.0.0.4";
 

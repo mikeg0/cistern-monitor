@@ -4,6 +4,7 @@
 #include <LiquidCrystal_I2C.h>
 #include <AsyncElegantOTA.h>
 #include <SPIFFS.h>
+#include "alarm_sound.h"
 
 extern LiquidCrystal_I2C lcd;
 
@@ -12,6 +13,8 @@ extern int currentWaterLevel;
 extern int minWaterLevel;
 extern int maxWaterLevel;
 extern int realTimeStats;
+extern int highWaterAlarmState;
+extern int lowWaterAlarmState;
 
 // extern const int networkLedPin;
 // extern const int lcdBrightnessPin;
@@ -46,8 +49,8 @@ void CMWeb::_webSocketClientInit()
     waterLevel["maxWaterLevel"] = maxWaterLevel;
 
     CMWeb::notifyClients("WATER_LEVEL", waterLevel);
-    CMWeb::notifyClients("HIGH_WATER_ALARM", false);
-    CMWeb::notifyClients("LOW_WATER_ALARM", false);
+    CMWeb::notifyClients("HIGH_WATER_ALARM", (highWaterAlarmState) ? true : false);
+    CMWeb::notifyClients("LOW_WATER_ALARM", (lowWaterAlarmState) ? true : false);
     CMWeb::notifyClients("REAL_TIME_STATS", realTimeStats);
 }
 
@@ -119,6 +122,8 @@ void CMWeb::_handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
                 lcd.clear();
                 // Print a message to the LCD.
                 lcd.print((const char *)wsEvent["statusMessage"]);
+
+                alarmSound();
 
                 delay(3000);
                 lcd.noDisplay();

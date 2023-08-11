@@ -32,10 +32,11 @@ RESEARCH/IDEAS:
 #include <LiquidCrystal_I2C.h>
 #include <PubSubClient.h>
 #include "utils.h"
+#include "alarm_sound.h"
 #include "web.h"
 
-bool highWaterAlarmState = 0;
-bool lowWaterAlarmState = 0;
+int highWaterAlarmState = 0;
+int lowWaterAlarmState = 0;
 
 String highWaterLcdAlarmText = "OFF";
 String lowWaterLcdAlarmText = "OFF";
@@ -51,7 +52,6 @@ WiFiClient espClient;
 PubSubClient mqttClient(espClient);
 CMWeb cisternMonitorWeb;
 LiquidCrystal_I2C lcd(0x27, 16, 2);
-
 
 void connectMqtt(int initialConnect)
 {
@@ -104,6 +104,9 @@ void setup()
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Starting ...");
+
+    // startup sound
+    startupSound();
 
     if (!SPIFFS.begin(true))
     {
@@ -224,6 +227,13 @@ void loop()
     // ==  HIGH WATER FLOAT SENSOR == //
     int tempHighWaterAlarmState = digitalRead(highFloatSwitch);
 
+    // TODO: add alarm sound and reset capability (realTimeStats == 0 could be used to ignore alarm)
+    if (tempHighWaterAlarmState == HIGH)
+    {
+        alarmSound();
+    }
+
+
     if (highWaterAlarmState != tempHighWaterAlarmState)
     {
         highWaterAlarmState = tempHighWaterAlarmState;
@@ -301,49 +311,32 @@ void loop()
     if (minWaterLevel == 0 || minWaterLevel > currentWaterLevel) minWaterLevel = currentWaterLevel;
     if (maxWaterLevel < currentWaterLevel) maxWaterLevel = currentWaterLevel;
 
-
     unsigned long currentTime = millis();
 
-
-    // if (currentTime >= lcdDelayTime)
-    // {
-
-    //     // discover if value is trending so water level reports don't waffle
+    // TODO: discover if value is trending so water level reports don't waffle
     //     if (water_level_is_trending(currentWaterLevel) == 1)
     //     {
 
-            JSONVar waterLevel;
+    JSONVar waterLevel;
 
-            waterLevel["currentWaterLevel"] = currentWaterLevel;
-            waterLevel["minWaterLevel"] = minWaterLevel;
-            waterLevel["maxWaterLevel"] = maxWaterLevel;
+    waterLevel["currentWaterLevel"] = currentWaterLevel;
+    waterLevel["minWaterLevel"] = minWaterLevel;
+    waterLevel["maxWaterLevel"] = maxWaterLevel;
 
-            cisternMonitorWeb.notifyClients("WATER_LEVEL", waterLevel);
-            mqttClient.publish("cistern-monitor/water-level", String(currentWaterLevel).c_str());
+    cisternMonitorWeb.notifyClients("WATER_LEVEL", waterLevel);
+    mqttClient.publish("cistern-monitor/water-level", String(currentWaterLevel).c_str());
 
-            lcd.clear();
+    lcd.clear();
 
-            lcd.setCursor(0, 0);
-            lcd.print("High:");
-            lcd.print(highWaterLcdAlarmText);
-            lcd.print(" Low:");
-            lcd.print(lowWaterLcdAlarmText);
-            lcd.setCursor(0, 1);
-            lcd.printf("Water Level:%*d", 4, currentWaterLevel);
-    //     }
-    // }
-    // }
-
-    if (currentTime >= lcdBacklightOffTime)
-    {
-        // turn off backlight after 10 minutes of inactivity
-        lcd.noBacklight();
-        analogWrite(lcdBrightnessPin, 0);
-    }
+    lcd.setCursor(0, 0);
+    lcd.print("High:");
+    lcd.print(highWaterLcdAlarmText);
+    lcd.print(" Low:");
+    lcd.print(lowWaterLcdAlarmText);
+    lcd.setCursor(0, 1);
+    lcd.printf("Water Level:%*d", 4, currentWaterLevel);
 
     // One second delay before repeating measurement
     delay(1000);
-
-
 
 }
