@@ -7,6 +7,7 @@ function initWebSocket() {
     websocket.onopen = onOpen;
     websocket.onclose = onClose;
     websocket.onmessage = onMessage;
+    websocket.onerror = onError;
 }
 function onOpen(event) {
     document.getElementById('network-connection-lost').style.display = "none";
@@ -17,6 +18,14 @@ function onOpen(event) {
 }
 function onClose(event) {
     console.log('Connection closed');
+    document.getElementById('network-connection-lost').style.display = "block";
+
+    setTimeout(initWebSocket, 2000);
+}
+function onError(event) {
+    console.log('Connection error');
+    console.log(event);
+    
     document.getElementById('network-connection-lost').style.display = "block";
 
     setTimeout(initWebSocket, 2000);
