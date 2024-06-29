@@ -1,25 +1,27 @@
 /*
 TODO:
- - fix low water float switch shorting to ground
+ - fix low water float switch shorting to ground (might be caused by 5 outputs PWM signal at boot, strapping pin??)
+ - junction box:
+    - add speaker wire out / or mount speaker in box
+    - add 5v to 24v step up circuit for speaker??
+    - add waterproof alarm reset button / realtime stats toggle button
+    - re-wire lcd brightness pin with 2 pin female adapter
+ - add water level to tab in parenthesis (<title>(433)</title> tag)
+ - fix alarm sound on high water
  - remove src\Cistern_Monitor_SPIFF.ino; erase all git hub history for src\Cistern_Monitor_SPIFF.ino to remove wifi credentials
     - https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository
     - rename to open-cistern
- - toggle backlight / adjust backlight brightness via html button
  - toggle trend detector stats via html button (bootstrap switch)
+ - add timeout to realtime stats (turn off after 2 hours)
  - add timestamp to high/low water alarm
- - test lost network connection js listener and UI
  - js notification API
  - sleep mode (wake on float trigger)
  - LCD display:
-    - turn off backlight after timeout
-    - turn on backlight if any global variable changes
     - pad ON/OFF text to 3 characters
- - move LCD code to lcd library directory
- - clean up css; add bootstrap responsive grid
- - MQTT: add client reconnect if disconnected on network reset (copy OSMqtt::init(void))
+    - move LCD code to lcd library directory
 RESEARCH/IDEAS:
  - use openthings to iframe app for remote
- - curl post to stats service
+ - curl post to open sprinkler on LOW_WATER_ALARM
 */
 
 // Import required libraries
@@ -27,6 +29,7 @@ RESEARCH/IDEAS:
 #include "../lib/constants.h"
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
+#include <ElegantOTA.h>
 #include <Arduino_JSON.h>
 #include <SPIFFS.h>
 #include <LiquidCrystal_I2C.h>
@@ -167,7 +170,7 @@ void setup()
     digitalWrite(lowLedPin, LOW);
     digitalWrite(highLedPin, LOW);
 
-    pinMode(lowFloatSwitch, INPUT_PULLUP);
+    // pinMode(lowFloatSwitch, INPUT_PULLUP);
     pinMode(highFloatSwitch, INPUT_PULLUP);
 
     pinMode(trigPin, OUTPUT);
@@ -215,7 +218,7 @@ void loop()
 
     if (realTimeStats == 0) return;
 
-    digitalWrite(lowLedPin, lowWaterAlarmState); // low water float == 1 when above water line
+    digitalWrite(lowLedPin, lowWaterAlarmState);
     digitalWrite(highLedPin, highWaterAlarmState);
 
     // skip notifications until low water alarm has been reset
@@ -262,7 +265,7 @@ void loop()
     {
         lowWaterAlarmState = tempLowWaterAlarmState;
         digitalWrite(lowLedPin, lowWaterAlarmState);
-        if (lowWaterAlarmState == LOW)
+        if (lowWaterAlarmState == HIGH)
         {
             lowWaterLcdAlarmText = "ON";
 

@@ -18,7 +18,6 @@ void alarmSound()
 
     for (int hz = 440; hz < 880; hz++)
     {
-        // cancel siren sooner
         tone(alarmBuzzerPin, hz, 50);
         delay(5);
     }

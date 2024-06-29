@@ -2,7 +2,7 @@
 
 #include "web.h"
 #include <LiquidCrystal_I2C.h>
-#include <AsyncElegantOTA.h>
+#include <ElegantOTA.h>
 #include <SPIFFS.h>
 #include "alarm_sound.h"
 
@@ -76,6 +76,17 @@ void CMWeb::_handleWebSocketMessage(void *arg, uint8_t *data, size_t len)
                 CMWeb::_webSocketClientInit();
                 return;
             }
+
+            // reset the low, high and current water level values
+            if (strcmp((const char *)wsEvent["eventType"], "reset") == 0)
+            {
+                currentWaterLevel = 0;
+                minWaterLevel = 0;
+                maxWaterLevel = 0;
+
+                return;
+            }
+
 
             if (strcmp((const char *)wsEvent["eventType"], "reset-high-water-alarm") == 0)
             {
@@ -178,7 +189,7 @@ void CMWeb::initWebSocket()
     server.serveStatic("/", SPIFFS, "/");
 
     // Start ElegantOTA
-    AsyncElegantOTA.begin(&server);
+    ElegantOTA.begin(&server);
 
     // Start server
     server.begin();
