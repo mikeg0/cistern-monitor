@@ -5,6 +5,11 @@ Uses several sensors measure the water level of a cistern and current draw from 
 2) Float Switch (https://www.amazon.com/gp/product/B095HMXX6G)
 3) Current Transformer (https://www.amazon.com/gp/product/B07XYRCSHB)
 
+![Cistern Monitor Cardboard Prototype](proto-cardboard.jpg)
+
+![Cistern Monitor Layout](bread-board-layout-power-supply-wiring-and-jst.jpg)
+
+
 FEATURES:
  - High Water Float sensor (cistern overflow alarm)
  - Low Water Float sensor (irrigation pump shutoff and alarm)
