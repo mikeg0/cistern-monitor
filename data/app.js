@@ -25,7 +25,7 @@ function onClose(event) {
 function onError(event) {
     console.log('Connection error');
     console.log(event);
-    
+
     document.getElementById('network-connection-lost').style.display = "block";
 
     setTimeout(initWebSocket, 2000);
@@ -38,10 +38,11 @@ function onMessage(event) {
             document.getElementById('toggle-real-time').checked = eventData.value;
             break;
 
-        case "WATER_LEVEL":
-            document.getElementById('water-level-state').innerHTML = eventData.value.currentWaterLevel + " mm";
-            document.getElementById('max-water-level').innerHTML = eventData.value.maxWaterLevel  + " mm";
-            document.getElementById('min-water-level').innerHTML = eventData.value.minWaterLevel + " mm";
+        case "SYSTEM_STATE":
+            document.getElementById('water-level-state').innerHTML = eventData.value.currentWaterLevel + "%";
+            document.getElementById('max-water-level').innerHTML = eventData.value.maxWaterLevel  + "%";
+            document.getElementById('min-water-level').innerHTML = eventData.value.minWaterLevel + "%";
+            document.getElementById('pump-current').innerHTML = eventData.value.pumpCurrent + "A";
 
             break;
 

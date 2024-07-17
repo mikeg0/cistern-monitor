@@ -1,6 +1,5 @@
 /*
 TODO:
- - fix low water float switch shorting to ground (might be caused by 5 outputs PWM signal at boot, strapping pin??)
  - junction box:
     - add speaker wire out / or mount speaker in box
     - add 5v to 24v step up circuit for speaker??
@@ -45,6 +44,7 @@ String highWaterLcdAlarmText = "OFF";
 String lowWaterLcdAlarmText = "OFF";
 
 int currentWaterLevel = 0;
+int pumpCurrent = 0;
 int minWaterLevel = 0;
 int maxWaterLevel = 0;
 
@@ -170,11 +170,11 @@ void setup()
     digitalWrite(lowLedPin, LOW);
     digitalWrite(highLedPin, LOW);
 
-    // pinMode(lowFloatSwitch, INPUT_PULLUP);
-    pinMode(highFloatSwitch, INPUT_PULLUP);
+    pinMode(lowFloatSwitch, INPUT);
+    pinMode(highFloatSwitch, INPUT);
 
-    pinMode(trigPin, OUTPUT);
-    pinMode(echoPin, INPUT);
+    pinMode(pressureSensorPin, INPUT);
+    pinMode(currentTransformerSensorPin, INPUT);
 
     // Connect to Wi-Fi
     WiFi.begin(ssid, password);
@@ -209,10 +209,10 @@ void setup()
 void loop()
 {
 
-    if (!mqttClient.connected()) {
-        connectMqtt(0);
-    }
-    mqttClient.loop();
+    // if (!mqttClient.connected()) {
+    //     connectMqtt(0);
+    // }
+    // mqttClient.loop();
 
     cisternMonitorWeb.cleanupClients();
 
@@ -227,8 +227,36 @@ void loop()
 
     // TODO: if highWaterAlarmState == 1 alert browser max five times
 
+    // ==  PRESSURE SENSOR == //
+    long int ps_reading = 0;
+    for (int i = 0; i < 1000; i++) {ps_reading += analogRead(pressureSensorPin);}
+
+    float psVoltage = (float)ps_reading/1000;
+
+    Serial.print("Voltage: ");
+    Serial.println(psVoltage);
+
+    currentWaterLevel = static_cast<int>(psVoltage / 1024);
+
+
+    // ==  CURRENT TRANSFORMER SENSOR == //
+    long int ct_reading = 0;
+    for (int i = 0; i < 1000; i++) {ct_reading += analogRead(currentTransformerSensorPin);}
+
+    float ctVoltage = (float)ct_reading/1000;
+
+    pumpCurrent = (int)ctVoltage;
+
+    Serial.print("Pump AMPs: ");
+    Serial.println(ctVoltage);
+
     // ==  HIGH WATER FLOAT SENSOR == //
     int tempHighWaterAlarmState = digitalRead(highFloatSwitch);
+
+    Serial.print("tempHighWaterAlarmState: ");
+    Serial.print(tempHighWaterAlarmState);
+    Serial.println("");
+
 
     // TODO: add alarm sound and reset capability (realTimeStats == 0 could be used to ignore alarm)
     if (tempHighWaterAlarmState == HIGH)
@@ -258,8 +286,12 @@ void loop()
     }
 
     // ==  LOW WATER FLOAT SENSOR == //
-    // int tempLowWaterAlarmState = digitalRead(lowFloatSwitch);
-    int tempLowWaterAlarmState = 0;
+    int tempLowWaterAlarmState = digitalRead(lowFloatSwitch);
+
+    Serial.print("tempLowWaterAlarmState: ");
+    Serial.print(tempLowWaterAlarmState);
+    Serial.println("");
+
 
     if (lowWaterAlarmState != tempLowWaterAlarmState)
     {
@@ -285,49 +317,26 @@ void loop()
         }
     }
 
-    // ==  ULTRASONIC SENSOR == //
-    // Set the trigger pin LOW for 2uS
-    digitalWrite(trigPin, LOW);
-    delayMicroseconds(2);
-
-    // Set the trigger pin HIGH for 20us to send pulse
-    digitalWrite(trigPin, HIGH);
-    delayMicroseconds(20);
-
-    // Return the trigger pin to LOW
-    digitalWrite(trigPin, LOW);
-
-    // Measure the width of the incoming pulse
-    int duration = pulseIn(echoPin, HIGH);
-
-    // Determine distance from duration
-    // Use 343 metres per second as speed of sound
-    // Divide by 1000 as we want millimeters
-
-    currentWaterLevel = (duration / 2) * 0.343;
-
-    // Print result to serial monitor
-    Serial.print(" currentWaterLevel: ");
-    Serial.print(currentWaterLevel);
-    Serial.println(" mm");
 
     if (minWaterLevel == 0 || minWaterLevel > currentWaterLevel) minWaterLevel = currentWaterLevel;
     if (maxWaterLevel < currentWaterLevel) maxWaterLevel = currentWaterLevel;
 
     unsigned long currentTime = millis();
 
+
     // TODO: discover if value is trending so water level reports don't waffle
-    //     if (water_level_is_trending(currentWaterLevel) == 1)
-    //     {
+    // if (water_level_is_trending(currentWaterLevel) == 1) {}
 
     JSONVar waterLevel;
 
     waterLevel["currentWaterLevel"] = currentWaterLevel;
     waterLevel["minWaterLevel"] = minWaterLevel;
     waterLevel["maxWaterLevel"] = maxWaterLevel;
+    waterLevel["pumpCurrent"] = pumpCurrent;
 
-    cisternMonitorWeb.notifyClients("WATER_LEVEL", waterLevel);
-    mqttClient.publish("cistern-monitor/water-level", String(currentWaterLevel).c_str());
+    cisternMonitorWeb.notifyClients("SYSTEM_STATE", waterLevel);
+    // mqttClient.publish("cistern-monitor/water-level", String(currentWaterLevel).c_str());
+
 
     lcd.clear();
 
@@ -337,7 +346,8 @@ void loop()
     lcd.print(" Low:");
     lcd.print(lowWaterLcdAlarmText);
     lcd.setCursor(0, 1);
-    lcd.printf("Water Level:%*d", 4, currentWaterLevel);
+    lcd.printf("W: %3d%%", (int)currentWaterLevel);
+    lcd.printf("  P:%5d", (int)ctVoltage);
 
     // One second delay before repeating measurement
     delay(1000);

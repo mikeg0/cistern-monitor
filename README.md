@@ -1,6 +1,9 @@
 # Cistern Monitor
 
-Uses an ultrasonic sensor to measure the water level of a cistern.  
+Uses several sensors measure the water level of a cistern and current draw from a 180 PSI irrigation pump
+1) Pressure Sensor (https://www.amazon.com/gp/product/B07PXFPPMM)
+2) Float Switch (https://www.amazon.com/gp/product/B095HMXX6G)
+3) Current Transformer (https://www.amazon.com/gp/product/B07XYRCSHB)
 
 FEATURES:
  - High Water Float sensor (cistern overflow alarm)
@@ -10,11 +13,6 @@ FEATURES:
  - OTA firmware updates
  - WIFI SID and password via json config file
 
-
 TODO:
- - high/low water level to global var
- - reset high/low water level var from html button
- - lost network connection js listener and UI
- - js notification API
- - sleep mode (wake on high/low water sensor trigger)
+ - sleep mode (add motion detector; wake on trigger)
 

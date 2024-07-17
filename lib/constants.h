@@ -4,14 +4,14 @@ const int networkLedPin = 2;
 
 const int lcdBrightnessPin = 15;
 
-const int trigPin = 17; // trigger pin for JSN-SR04T
-const int echoPin = 16; // echo pin for JSN-SR04T
+const int pressureSensorPin = 34;
+const int currentTransformerSensorPin = 35;
 
 const int lowLedPin = 12;
 const int highLedPin = 13;
 
 const int highFloatSwitch = 23;
-const int lowFloatSwitch = 5;  // TODO: change this pin to 18;  5 outputs PWM signal at boot, strapping pin
+const int lowFloatSwitch = 18;
 
 const int alarmBuzzerPin = 25;
 

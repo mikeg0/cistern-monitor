@@ -28,12 +28,16 @@
                 <p class="state"><span id="high-water-state"></span></p>
             </div>
             <div class="card">
-                <h2>Current Water Level</h2>
+                <h2>Water Level</h2>
                 <p class="state"><span id="water-level-state"></span></p>
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" role="switch" id="toggle-real-time">
                     <label class="form-check-label" for="toggle-real-time">Real Time Stats</label>
-                  </div>
+                </div>
+            </div>
+            <div class="card">
+                <h2>Pump Current</h2>
+                <p class="state"><span id="pump-current"></span></p>
             </div>
             <div class="card">
                 <h2>High Water Level</h2>
@@ -43,7 +47,7 @@
                 <p><button type="button" class="btn btn-success" id="reset-water-level-minmax">Reset</button></p>
             </div>
             <div class="card">
-                <h2>Status Messaage</h2>
+                <h2>Status Message</h2>
                 <p><input id="status-message" type="text" value="" /></p>
                 <p><button type="button" class="btn btn-success" id="send-status-message">Send</button></p>
             </div>

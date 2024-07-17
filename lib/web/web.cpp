@@ -12,6 +12,7 @@ extern LiquidCrystal_I2C lcd;
 extern int currentWaterLevel;
 extern int minWaterLevel;
 extern int maxWaterLevel;
+extern int pumpCurrent;
 extern int realTimeStats;
 extern int highWaterAlarmState;
 extern int lowWaterAlarmState;
@@ -47,8 +48,10 @@ void CMWeb::_webSocketClientInit()
     waterLevel["currentWaterLevel"] = currentWaterLevel;
     waterLevel["minWaterLevel"] = minWaterLevel;
     waterLevel["maxWaterLevel"] = maxWaterLevel;
+    waterLevel["pumpCurrent"] = pumpCurrent;
 
-    CMWeb::notifyClients("WATER_LEVEL", waterLevel);
+
+    CMWeb::notifyClients("SYSTEM_STATE", waterLevel);
     CMWeb::notifyClients("HIGH_WATER_ALARM", (highWaterAlarmState) ? true : false);
     CMWeb::notifyClients("LOW_WATER_ALARM", (lowWaterAlarmState) ? true : false);
     CMWeb::notifyClients("REAL_TIME_STATS", realTimeStats);
@@ -173,6 +176,18 @@ void CMWeb::cleanupClients()
     ws.cleanupClients();
 }
 
+void onOTAEnd(bool success) {
+  // Log when OTA has finished
+  if (success) {
+    Serial.println("Update complete, restarting...");
+    delay(1000);  // Optional delay to allow serial output to complete
+    esp_restart();
+  } else {
+    Serial.println("There was an error during OTA update!");
+  }
+}
+
+
 void CMWeb::initWebSocket()
 {
     // Route for root / web page
@@ -190,6 +205,10 @@ void CMWeb::initWebSocket()
 
     // Start ElegantOTA
     ElegantOTA.begin(&server);
+
+    // auto reboot the module after OTA update
+    ElegantOTA.onEnd(onOTAEnd);
+
 
     // Start server
     server.begin();
