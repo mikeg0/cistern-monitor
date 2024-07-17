@@ -8,7 +8,7 @@ TODO:
     - re-wire lcd brightness pin with 2 pin female adapter
  - add water level to tab in parenthesis (<title>(433)</title> tag)
  - fix alarm sound on high water
- - remove src\Cistern_Monitor_SPIFF.ino; erase all git hub history for src\Cistern_Monitor_SPIFF.ino to remove wifi credentials
+ - remove 
     - https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/removing-sensitive-data-from-a-repository
     - rename to open-cistern
  - toggle trend detector stats via html button (bootstrap switch)
