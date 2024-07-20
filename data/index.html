@@ -19,7 +19,7 @@
         </div>
         <div class="content">
             <div id="low-water-state-card" class="card">
-                <h2>Pump Shutoff Alarm</h2>
+                <h2>Low Water Alarm</h2>
                 <p class="state"><span id="low-water-state"></span></p>
                 <!-- <p><button id="reset-low-water-alarm-button" disabled class="button">Reset Alarm</button></p> -->
             </div>
@@ -29,7 +29,10 @@
             </div>
             <div class="card">
                 <h2>Water Level</h2>
-                <p class="state"><span id="water-level-state"></span></p>
+                <p class="state">
+                    <span id="water-level-state"></span>
+                    <span id="ps-voltage"></span>
+                </p>
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" role="switch" id="toggle-real-time">
                     <label class="form-check-label" for="toggle-real-time">Real Time Stats</label>
@@ -40,9 +43,9 @@
                 <p class="state"><span id="pump-current"></span></p>
             </div>
             <div class="card">
-                <h2>High Water Level</h2>
+                <h2>Max Water Level</h2>
                 <p class="state"><span id="max-water-level"></span></p>
-                <h2>Low Water Level</h2>
+                <h2>Min Water Level</h2>
                 <p class="state"><span id="min-water-level"></span></p>
                 <p><button type="button" class="btn btn-success" id="reset-water-level-minmax">Reset</button></p>
             </div>

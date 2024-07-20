@@ -45,10 +45,11 @@ void CMWeb::_webSocketClientInit()
 {
     JSONVar waterLevel;
 
-    waterLevel["currentWaterLevel"] = currentWaterLevel;
+    waterLevel["waterLevel"] = currentWaterLevel;
     waterLevel["minWaterLevel"] = minWaterLevel;
     waterLevel["maxWaterLevel"] = maxWaterLevel;
     waterLevel["pumpCurrent"] = pumpCurrent;
+    waterLevel["version"] = "2024-07-20:08:30";
 
 
     CMWeb::notifyClients("SYSTEM_STATE", waterLevel);

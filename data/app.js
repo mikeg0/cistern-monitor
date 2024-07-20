@@ -39,17 +39,19 @@ function onMessage(event) {
             break;
 
         case "SYSTEM_STATE":
-            document.getElementById('water-level-state').innerHTML = eventData.value.currentWaterLevel + "%";
+            document.getElementById('water-level-state').innerHTML = eventData.value.waterLevel + "%";
+            document.getElementById('ps-voltage').innerHTML = "(" + eventData.value.psVoltage + ")";
             document.getElementById('max-water-level').innerHTML = eventData.value.maxWaterLevel  + "%";
             document.getElementById('min-water-level').innerHTML = eventData.value.minWaterLevel + "%";
-            document.getElementById('pump-current').innerHTML = eventData.value.pumpCurrent + "A";
+            document.getElementById('pump-current').innerHTML = eventData.value.pumpCurrent + " Amps";
 
             break;
 
         case "HIGH_WATER_ALARM":
-            // TODO: send browser notification
-
             if (eventData.value) {
+
+                document.title = "Overflow Alarm!";
+
                 document.getElementById('high-water-state').innerHTML = "ON";
                 document.getElementById('high-water-state').classList.add("alarm");
                 document.getElementById('high-water-state-card').classList.add("alarm");
@@ -63,6 +65,8 @@ function onMessage(event) {
 
         case "LOW_WATER_ALARM":
             if (eventData.value) {
+
+                document.title = "Low Water Alarm!";
                 document.getElementById('low-water-state').innerHTML = "ON";
                 document.getElementById('low-water-state').classList.add("alarm");
                 document.getElementById('low-water-state-card').classList.add("alarm");

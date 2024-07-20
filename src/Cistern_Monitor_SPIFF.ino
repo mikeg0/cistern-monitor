@@ -36,6 +36,7 @@ RESEARCH/IDEAS:
 #include "utils.h"
 #include "alarm_sound.h"
 #include "web.h"
+#include <driver/adc.h>
 
 int highWaterAlarmState = 0;
 int lowWaterAlarmState = 0;
@@ -49,6 +50,8 @@ int minWaterLevel = 0;
 int maxWaterLevel = 0;
 
 int realTimeStats = 1;
+
+int MAX_VOLTAGE = 1240;
 
 // Create MQTT client
 WiFiClient espClient;
@@ -97,6 +100,10 @@ void setup()
     // Serial port for debugging purposes
     Serial.begin(115200);
 
+    adc1_config_width(ADC_WIDTH_BIT_12);  // 12-bit resolution (0-4095)
+
+    adc1_config_channel_atten(ADC1_CHANNEL_6, ADC_ATTEN_DB_12);  // GPIO 34 (pressureSensorPin): No attenuation (0-1.1V)
+    adc1_config_channel_atten(ADC1_CHANNEL_7, ADC_ATTEN_DB_0);  // GPIO 35 (currentTransformerSensorPin): 11 dB attenuation (0-3.3V)
 
     lcd.init();
     lcd.backlight();
@@ -161,6 +168,7 @@ void setup()
         Serial.println("ERROR: password or ssid is emtpy.  please check the data/wifi_credentials.json file!");
         return;
     }
+
 
     pinMode(networkLedPin, OUTPUT);
 
@@ -229,23 +237,27 @@ void loop()
 
     // ==  PRESSURE SENSOR == //
     long int ps_reading = 0;
-    for (int i = 0; i < 1000; i++) {ps_reading += analogRead(pressureSensorPin);}
+    // for (int i = 0; i < 1000; i++) {ps_reading += analogRead(pressureSensorPin);}
+    for (int i = 0; i < 1000; i++) {ps_reading += adc1_get_raw(ADC1_CHANNEL_6);}  // GPIO 34 (pressureSensorPin): No attenuation (0-1.1V)
+
 
     float psVoltage = (float)ps_reading/1000;
+    float psPercentage = (float)(psVoltage / MAX_VOLTAGE) * 100;
+
+    // max psVoltage == 1024??
 
     Serial.print("Voltage: ");
     Serial.println(psVoltage);
 
-    currentWaterLevel = static_cast<int>(psVoltage / 1024);
+    currentWaterLevel = (int)psPercentage;
 
 
     // ==  CURRENT TRANSFORMER SENSOR == //
     long int ct_reading = 0;
-    for (int i = 0; i < 1000; i++) {ct_reading += analogRead(currentTransformerSensorPin);}
+    // for (int i = 0; i < 1000; i++) {ct_reading += analogRead(currentTransformerSensorPin);}
+    for (int i = 0; i < 1000; i++) {ps_reading += adc1_get_raw(ADC1_CHANNEL_7);}  // GPIO 35 (currentTransformerSensorPin): 11 dB attenuation (0-3.3V)
 
-    float ctVoltage = (float)ct_reading/1000;
-
-    pumpCurrent = (int)ctVoltage;
+    float ctVoltage = (float)ct_reading/1000/30;  // 1000 reading average divided by 30 (SCT-013-030: 30 A / 1V Current Sensor)
 
     Serial.print("Pump AMPs: ");
     Serial.println(ctVoltage);
@@ -261,7 +273,7 @@ void loop()
     // TODO: add alarm sound and reset capability (realTimeStats == 0 could be used to ignore alarm)
     if (tempHighWaterAlarmState == HIGH)
     {
-        alarmSound();
+        // alarmSound();
     }
 
 
@@ -329,10 +341,12 @@ void loop()
 
     JSONVar waterLevel;
 
-    waterLevel["currentWaterLevel"] = currentWaterLevel;
+    waterLevel["waterLevel"] = currentWaterLevel;
     waterLevel["minWaterLevel"] = minWaterLevel;
     waterLevel["maxWaterLevel"] = maxWaterLevel;
-    waterLevel["pumpCurrent"] = pumpCurrent;
+    waterLevel["pumpCurrent"] = String(ctVoltage, 2);
+    waterLevel["psVoltage"] = String(psVoltage, 2);
+    waterLevel["psPercentage"] = (int)psPercentage;
 
     cisternMonitorWeb.notifyClients("SYSTEM_STATE", waterLevel);
     // mqttClient.publish("cistern-monitor/water-level", String(currentWaterLevel).c_str());
@@ -347,7 +361,8 @@ void loop()
     lcd.print(lowWaterLcdAlarmText);
     lcd.setCursor(0, 1);
     lcd.printf("W: %3d%%", (int)currentWaterLevel);
-    lcd.printf("  P:%5d", (int)ctVoltage);
+    lcd.printf("  P: %s", String(ctVoltage, 2));
+
 
     // One second delay before repeating measurement
     delay(1000);
