@@ -43,3 +43,46 @@ int water_level_is_trending(int val) {
     // no trend change
     return 0;
 }
+
+
+// ==  read voltage from current transformer sensor == //
+float get_current_transformer_reading(Adafruit_ADS1115 ads) {
+    float sumOfSquares = 0;
+    int numSamples = 100;
+
+    // Configure A0 & A1 for the ±2.048V range
+    ads.setGain(GAIN_TWO);
+    ads.setDataRate(RATE_ADS1115_860SPS);
+
+    long sum = 0;
+    for (int i = 0; i < 100; i++) {
+        int16_t adc0 = ads.readADC_Differential_0_1();
+
+        float voltage = ads.computeVolts(adc0);
+
+        sumOfSquares += voltage * voltage;
+
+        delay(10); // Small delay to avoid overwhelming the ADC
+    }
+
+    float meanOfSquares = sumOfSquares / numSamples;
+    float rmsVoltage = sqrt(meanOfSquares);
+
+    return rmsVoltage;
+}
+
+// ==  read voltage from pressure sensor == //
+float get_pressure_sensor_reading(Adafruit_ADS1115 ads) {
+
+    // Configure A3 for the ±4.096V range
+    ads.setGain(GAIN_ONE);  // GAIN_ONE sets the range to ±4.096V
+    long sum = 0;
+    for (int i = 0; i < 100; i++) {
+        int16_t adc3 = ads.readADC_SingleEnded(3);
+        sum += adc3;
+        delay(10); // Small delay to avoid overwhelming the ADC
+    }
+
+    int16_t average = sum / 100;
+    return ads.computeVolts(average);  // Convert to voltage using computeVolts()
+}

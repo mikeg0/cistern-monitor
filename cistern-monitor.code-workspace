@@ -3,6 +3,10 @@
         {
             "name": "Cistern Monitor with SPIFF",
             "path": "."
+        },
+        {
+            "name": "mosfet-amplifier-uno",
+            "path": "../mosfet-amplifier-uno"
         }
     ],
     "settings": {

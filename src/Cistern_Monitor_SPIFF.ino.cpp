@@ -1,5 +1,7 @@
-
-// Import required libraries
+# 1 "C:\\Users\\micha\\AppData\\Local\\Temp\\tmpbnerncdx"
+#include <Arduino.h>
+# 1 "C:/dev/cistern-monitor/src/Cistern_Monitor_SPIFF.ino"
+# 28 "C:/dev/cistern-monitor/src/Cistern_Monitor_SPIFF.ino"
 #include "../lib/constants.h"
 #include <WiFi.h>
 #include <ESPAsyncWebServer.h>
@@ -28,7 +30,7 @@ int maxWaterLevel = 0;
 
 int realTimeStats = 1;
 
-float MIN_PS_VOLTAGE = 1.681;
+float MIN_PS_VOLTAGE = 1.6;
 float MAX_PS_VOLTAGE = 4.0;
 
 WiFiClient espClient;
@@ -36,28 +38,31 @@ PubSubClient mqttClient(espClient);
 CMWeb cisternMonitorWeb;
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 Adafruit_ADS1115 ads;
-
+void connectMqtt(int initialConnect);
+void setup();
+void loop();
+#line 65 "C:/dev/cistern-monitor/src/Cistern_Monitor_SPIFF.ino"
 void connectMqtt(int initialConnect)
 {
 
     if (initialConnect) {
-        // connect to mqtt server
+
         mqttClient.setServer(mqttHost.c_str(), 1883);
     }
 
     while (!mqttClient.connected()) {
         Serial.print("Attempting MQTT connection...");
-        // Create a random client ID
+
         String clientId = "cistern-monitor-client";
 
-        // Attempt to connect
+
         if (mqttClient.connect(clientId.c_str())) {
            Serial.println("connected");
         } else {
             Serial.print("failed, rc=");
             Serial.print(mqttClient.state());
             Serial.println(" try again in 5 seconds");
-            // Wait 5 seconds before retrying
+
             delay(5000);
         }
     }
@@ -75,23 +80,23 @@ void connectMqtt(int initialConnect)
 
 void setup()
 {
-    // Serial port for debugging purposes
+
     Serial.begin(115200);
 
-    Wire.begin();  // Initialize I2C bus
-    ads.begin();   // Initialize the ADS1115
+    Wire.begin();
+    ads.begin();
     lcd.begin(16, 2);
 
     lcd.backlight();
 
     analogWrite(lcdBrightnessPin, 125);
 
-    // Clears the LCD screen
+
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("Starting ...");
 
-    // startup sound
+
     startupSound();
 
     if (!SPIFFS.begin(true))
@@ -100,7 +105,7 @@ void setup()
     }
     Serial.println("SPIFFS mounted successfully");
 
-    // open data/wifi_credentials.json for reading
+
     File file = SPIFFS.open("/wifi_credentials.json", FILE_READ);
 
     if (!file)
@@ -112,9 +117,9 @@ void setup()
     String fileContent;
     while (file.available())
     {
-        // Read line by line
+
         String line = file.readStringUntil('\n');
-        fileContent += line; // Append each line to fileContent
+        fileContent += line;
     }
 
     file.close();
@@ -157,7 +162,7 @@ void setup()
     pinMode(lowFloatSwitch, INPUT);
     pinMode(highFloatSwitch, INPUT);
 
-    // Connect to Wi-Fi
+
     IPAddress ip(10, 0, 0, 150);
     IPAddress gateway(10, 0, 0, 1);
     IPAddress subnet(255, 255, 255, 0);
@@ -173,14 +178,14 @@ void setup()
 
     WiFi.setHostname("Cistern Monitor");
 
-    // Print ESP Local IP Address
+
     Serial.println("");
     Serial.print("Connected to ");
     Serial.println(ssid);
     Serial.print("IP address: ");
     Serial.println(WiFi.localIP());
 
-    // Print ssid and ip address on LCD
+
     lcd.setCursor(0, 0);
     lcd.print(ssid);
     lcd.setCursor(0, 1);
@@ -209,11 +214,11 @@ void loop()
     digitalWrite(lowLedPin, lowWaterAlarmState);
     digitalWrite(highLedPin, highWaterAlarmState);
 
-    // skip notifications until low water alarm has been reset
-    // if (lowWaterAlarmState == 1)
-    //     return;
 
-    // TODO: if highWaterAlarmState == 1 alert browser max five times
+
+
+
+
 
     float ps_reading = get_pressure_sensor_reading(ads);
     float ct_reading = get_current_transformer_reading(ads);
@@ -228,7 +233,7 @@ void loop()
         currentWaterLevel = ((ps_reading - MIN_PS_VOLTAGE) / (MAX_PS_VOLTAGE - MIN_PS_VOLTAGE)) * 100;
     }
 
-    // ==  HIGH WATER FLOAT SENSOR == //
+
     int tempHighWaterAlarmState = digitalRead(highFloatSwitch);
 
     if (tempHighWaterAlarmState == HIGH)
@@ -256,7 +261,7 @@ void loop()
         }
     }
 
-    // ==  LOW WATER FLOAT SENSOR == //
+
     int tempLowWaterAlarmState = digitalRead(lowFloatSwitch);
 
     if (lowWaterAlarmState != tempLowWaterAlarmState)
@@ -267,8 +272,8 @@ void loop()
         {
             lowWaterLcdAlarmText = "ON";
 
-            // TODO: disable OpenSrpinkler
-            // send curl request to http://10.0.0.152/cv?pw=4b5a7c40078b04f5c79c5f1a463141f3&en=0&_=1688566304970
+
+
             cisternMonitorWeb.notifyClients("LOW_WATER_ALARM", true);
             Serial.println("LOW_WATER_ALARM ON");
             mqttClient.publish("cistern-monitor/low-water-alarm", "on");
@@ -290,8 +295,8 @@ void loop()
     unsigned long currentTime = millis();
 
 
-    // TODO: discover if value is trending so water level reports don't waffle
-    // if (water_level_is_trending(currentWaterLevel) == 1) {}
+
+
 
     JSONVar waterLevel;
 
@@ -311,7 +316,7 @@ void loop()
     waterLevel["psVoltage"] = String(ps_reading, 5);
 
     cisternMonitorWeb.notifyClients("SYSTEM_STATE", waterLevel);
-    // mqttClient.publish("cistern-monitor/water-level", String(currentWaterLevel).c_str());
+
 
 
     lcd.clear();
@@ -325,7 +330,7 @@ void loop()
     lcd.printf("W: %3d%%", (int)currentWaterLevel);
     lcd.printf(" P: %s", String(pumpCurrent, 2));
 
-    // One second delay before repeating measurement
+
     delay(1000);
 
 }

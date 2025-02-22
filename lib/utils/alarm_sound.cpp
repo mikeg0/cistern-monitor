@@ -15,17 +15,9 @@ void startupSound()
 
 void alarmSound()
 {
-
-    for (int hz = 440; hz < 880; hz++)
-    {
-        tone(alarmBuzzerPin, hz, 50);
-        delay(5);
-    }
-
-    delay(1000);
-    tone(alarmBuzzerPin, 100, 500);
-    delay(1000);
-    tone(alarmBuzzerPin, 100, 500);
-    delay(1000);
-    tone(alarmBuzzerPin, 100, 500);
+    tone(alarmBuzzerPin, 440, 500);
+    delay(500);
+    tone(alarmBuzzerPin, 440, 500);
+    delay(500);
+    tone(alarmBuzzerPin, 440, 500);
 }

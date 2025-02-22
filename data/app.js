@@ -83,7 +83,7 @@ function onMessage(event) {
     }
 }
 function onLoad(event) {
-    initWebSocket();
+    setTimeout(initWebSocket, 1000);
     initButtons();
 }
 function initButtons() {

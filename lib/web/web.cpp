@@ -2,6 +2,7 @@
 
 #include "web.h"
 #include <LiquidCrystal_I2C.h>
+#include <ESPAsyncWebServer.h>
 #include <ElegantOTA.h>
 #include <SPIFFS.h>
 #include "alarm_sound.h"
@@ -49,8 +50,9 @@ void CMWeb::_webSocketClientInit()
     waterLevel["minWaterLevel"] = minWaterLevel;
     waterLevel["maxWaterLevel"] = maxWaterLevel;
     waterLevel["pumpCurrent"] = pumpCurrent;
-    waterLevel["version"] = "2024-07-20:08:30";
-
+    waterLevel["ctVoltage"] = "0.1";
+    waterLevel["psVoltage"] = "0.1";
+    waterLevel["version"] = __DATE__ " " __TIME__;
 
     CMWeb::notifyClients("SYSTEM_STATE", waterLevel);
     CMWeb::notifyClients("HIGH_WATER_ALARM", (highWaterAlarmState) ? true : false);
@@ -174,7 +176,7 @@ void CMWeb::_onEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEv
 
 void CMWeb::cleanupClients()
 {
-    ws.cleanupClients();
+    ws.cleanupClients(5);
 }
 
 void onOTAEnd(bool success) {
@@ -188,7 +190,11 @@ void onOTAEnd(bool success) {
   }
 }
 
+void networkLedCallback(TimerHandle_t xTimer) {
+    digitalWrite(networkLedPin, LOW);
+}
 
+TimerHandle_t timerHandle;
 void CMWeb::initWebSocket()
 {
     // Route for root / web page
@@ -198,8 +204,10 @@ void CMWeb::initWebSocket()
 
         request->send(SPIFFS, "/index.html", "text/html", false);
 
-        delay(500);
-        digitalWrite(networkLedPin, LOW);
+        // Set timeout handler to turn off networkLedPin after 500 milliseconds
+        timerHandle = xTimerCreate("Timer", pdMS_TO_TICKS(500), pdFALSE, (void *)0, networkLedCallback);
+        xTimerStart(timerHandle, 0);
+
     });
 
     server.serveStatic("/", SPIFFS, "/");
@@ -218,5 +226,6 @@ void CMWeb::initWebSocket()
 
 
     ws.onEvent(CMWeb::_onEvent);
+
     server.addHandler(&ws);
 }
